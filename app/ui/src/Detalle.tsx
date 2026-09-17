@@ -63,8 +63,8 @@ export function Detalle({ calc, modelo, rol }: { calc: any; modelo: any; rol: st
                       {k.notas.length > 0 && <ul className="notas">{k.notas.map((n: string, i: number) => <li key={i}>{n}</li>)}</ul>}
                     </td>
                     <td className="n">{num(k.pesoEfectivo, 2)}{k.pesoEfectivo !== k.pesoBase && <span className="small muted"> ({k.pesoBase})</span>}</td>
-                    <td className="n">{pendiente ? <span className="muted">pendiente</span> : num(k.valor, 2)}</td>
-                    <td className="small">{noComputa ? '—' : <>{num(k.niveles.umbral, 2)} · {k.niveles.llave !== undefined && k.niveles.llave !== null ? `${num(k.niveles.llave, 2)} · ` : ''}{num(k.niveles.objetivo, 2)} · {num(k.niveles.excelencia, 2)}<Barra logro={k.logro} /></>}</td>
+                    <td className="n">{pendiente ? <span className="muted">pendiente</span> : k.id === 'K9_DISPONIBILIDAD' ? (k.valor === 100 ? 'cumple' : 'no cumple') : num(k.valor, 2)}</td>
+                    <td className="small">{noComputa ? '—' : k.id === 'K9_DISPONIBILIDAD' ? <>binario<Barra logro={k.logro} /></> : <>{num(k.niveles.umbral, 2)} · {k.niveles.llave !== undefined && k.niveles.llave !== null ? `${num(k.niveles.llave, 2)} · ` : ''}{num(k.niveles.objetivo, 2)} · {num(k.niveles.excelencia, 2)}<Barra logro={k.logro} /></>}</td>
                     <td className="n">{noComputa ? '—' : `${num(k.logro)} %`}</td>
                     <td className="n">{num(k.puntos, 2)}</td>
                   </tr>

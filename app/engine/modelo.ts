@@ -51,22 +51,22 @@ export interface KpiDef {
 }
 
 export const KPIS: KpiDef[] = [
-  { id: 'K1_FACTURACION', bloque: 'VENTAS', nombre: 'Facturación neta vs. objetivo', tipo: 'P', peso: 15, sentido: 'mayor', unidad: '% del objetivo', fuente: 'Revo', origen: 'manual', mensualizado: true },
-  { id: 'K2_TICKET', bloque: 'VENTAS', nombre: 'Ticket medio vs. objetivo', tipo: 'D', peso: 8, sentido: 'mayor', unidad: '% del objetivo', fuente: 'Revo', origen: 'manual', mensualizado: true },
+  { id: 'K1_FACTURACION', bloque: 'VENTAS', nombre: 'Facturación neta', tipo: 'P', peso: 15, sentido: 'mayor', unidad: '€ del trimestre', fuente: 'Revo', origen: 'manual', mensualizado: true },
+  { id: 'K2_TICKET', bloque: 'VENTAS', nombre: 'Ticket medio', tipo: 'D', peso: 8, sentido: 'mayor', unidad: '€', fuente: 'Revo', origen: 'manual' },
   { id: 'K3_PRODUCTOS', bloque: 'VENTAS', nombre: 'Penetración de productos estratégicos', tipo: 'D', peso: 7, sentido: 'mayor', unidad: '% de tickets', fuente: 'Revo', origen: 'manual' },
-  { id: 'K4A_RESENAS_VOLUMEN', bloque: 'ATENCION', nombre: 'Reseñas del periodo: volumen', tipo: 'P', peso: 6, sentido: 'mayor', unidad: '% del objetivo', fuente: 'Joombo', origen: 'manual', mensualizado: true },
+  { id: 'K4A_RESENAS_VOLUMEN', bloque: 'ATENCION', nombre: 'Reseñas del periodo: volumen', tipo: 'P', peso: 6, sentido: 'mayor', unidad: 'reseñas del trimestre', fuente: 'Joombo', origen: 'manual', mensualizado: true },
   { id: 'K4B_RESENAS_NOTA', bloque: 'ATENCION', nombre: 'Reseñas del periodo: nota media', tipo: 'P', peso: 4, sentido: 'mayor', unidad: 'nota 1–5', fuente: 'Joombo', origen: 'manual' },
   { id: 'K5_RATING_UBER', bloque: 'ATENCION', nombre: 'Rating de Uber Eats del periodo', tipo: 'P', peso: 5, sentido: 'mayor', unidad: 'nota 1–5', fuente: 'Uber Eats', origen: 'automatico' },
-  { id: 'K6A_MISTERIOSO_SALA', bloque: 'ATENCION', nombre: 'Cliente misterioso: sala y experiencia', tipo: 'P', peso: 4, sentido: 'mayor', unidad: 'puntos 0–100', fuente: 'Ficha propia', origen: 'manual' },
-  { id: 'K6B_MISTERIOSO_PRODUCTO', bloque: 'ATENCION', nombre: 'Cliente misterioso: producto', tipo: 'P', peso: 1, sentido: 'mayor', unidad: 'puntos 0–100', fuente: 'Ficha propia', origen: 'manual' },
+  { id: 'K6A_MISTERIOSO_SALA', bloque: 'ATENCION', nombre: 'Cliente misterioso: sala y experiencia', tipo: 'P', peso: 4, sentido: 'mayor', unidad: 'nota 1–10', fuente: 'Ficha propia', origen: 'manual' },
+  { id: 'K6B_MISTERIOSO_PRODUCTO', bloque: 'ATENCION', nombre: 'Cliente misterioso: producto', tipo: 'P', peso: 1, sentido: 'mayor', unidad: 'nota 1–10', fuente: 'Ficha propia', origen: 'manual' },
   { id: 'K7_PRECISION', bloque: 'OPERACIONES', nombre: 'Precisión del pedido (Inaccurate Orders Rate)', tipo: 'D', peso: 15, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K8_COCINA', bloque: 'OPERACIONES', nombre: 'Incidencias imputables a cocina', tipo: 'C', peso: 3, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
-  { id: 'K9_DISPONIBILIDAD', bloque: 'OPERACIONES', nombre: 'Disponibilidad del canal', tipo: 'D', peso: 2, sentido: 'mayor', unidad: 'logro del peor de Online / Unfulfilled', fuente: 'Uber Eats', origen: 'automatico' },
+  { id: 'K9_DISPONIBILIDAD', bloque: 'OPERACIONES', nombre: 'Disponibilidad del canal (Online Rate)', tipo: 'D', peso: 2, sentido: 'mayor', unidad: 'binario: Online Rate ≥ objetivo', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K10_CHECKLIST', bloque: 'MANTENIMIENTO', nombre: 'Fiabilidad del checklist semanal', tipo: 'D', peso: 6, sentido: 'mayor', unidad: '% líneas válidas (peor hoja)', fuente: 'Hojas A y B', origen: 'manual' },
   { id: 'K11_HALLAZGOS', bloque: 'MANTENIMIENTO', nombre: 'Hallazgos cerrados en la visita siguiente', tipo: 'D', peso: 4, sentido: 'mayor', unidad: '% de hallazgos', fuente: 'Hoja de visita', origen: 'manual' },
   { id: 'K12A_INICIATIVAS', bloque: 'DIRECCION', nombre: 'Iniciativas corporativas implantadas en plazo', tipo: 'OBJ', peso: 10, sentido: 'mayor', unidad: '% en plazo', fuente: 'Registro', origen: 'manual' },
   { id: 'K12B_REPORTES', bloque: 'DIRECCION', nombre: 'Reportes entregados en fecha', tipo: 'OBJ', peso: 5, sentido: 'mayor', unidad: '% en fecha', fuente: 'Registro', origen: 'manual' },
-  { id: 'K13_CUALITATIVA', bloque: 'DIRECCION', nombre: 'Valoración cualitativa de dirección', tipo: 'JUICIO', peso: 5, sentido: 'mayor', unidad: 'puntos 0–8', fuente: 'Rúbrica', origen: 'manual' },
+  { id: 'K13_CUALITATIVA', bloque: 'DIRECCION', nombre: 'Valoración cualitativa de dirección', tipo: 'JUICIO', peso: 5, sentido: 'mayor', unidad: 'nota 1–10', fuente: 'Valoración escrita', origen: 'manual' },
 ];
 
 export const KPI_POR_ID: Record<KpiId, KpiDef> = Object.fromEntries(KPIS.map(k => [k.id, k])) as any;
@@ -85,5 +85,5 @@ export const MOTIVO_NEUTRALIZACION_TEXTO: Record<MotivoNeutralizacion, string> =
   NO_COMUNICADO_T15: 'Objetivo no comunicado por escrito antes del inicio del periodo',
 };
 
-/** Rúbrica cualitativa: 4 criterios × 0–2 = 8. Niveles por defecto: umbral 4, objetivo 6, excelencia 8 (7/8 → 110%). */
-export const NIVELES_CUALITATIVA = { umbral: 4, objetivo: 6, excelencia: 8 } as const;
+/** Valoración cualitativa: nota 1–10 con un decimal y justificación escrita. Niveles por defecto (carta Q4-2026): 6 · 7 · 8 · 10. */
+export const NIVELES_CUALITATIVA = { umbral: 6, llave: 7, objetivo: 8, excelencia: 10 } as const;

@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS config_periodo (
   importe_objetivo REAL NOT NULL, perfil_canal TEXT NOT NULL DEFAULT 'MIXTO',
   suelo_nota_resenas REAL NOT NULL, umbral_descuentos_pct REAL NOT NULL DEFAULT 0.3,
   prorrateo REAL NOT NULL DEFAULT 1, baja_voluntaria INTEGER NOT NULL DEFAULT 0,
+  fecha_alta TEXT, fecha_baja TEXT, dias_it INTEGER NOT NULL DEFAULT 0, -- situaciones especiales; prorrateo se recalcula a partir de ellas
   productos_estrategicos TEXT, fecha_comunicacion TEXT, fecha_extraccion_prevista TEXT,
   autor TEXT, ts TEXT NOT NULL,
   PRIMARY KEY (local_id, periodo_id)
@@ -87,7 +88,8 @@ CREATE TABLE IF NOT EXISTS hallazgos (
   hoja TEXT NOT NULL, linea_id TEXT NOT NULL, descripcion TEXT,
   reportado_previamente INTEGER NOT NULL DEFAULT 0,  -- el Manager ya lo había avisado: nunca penaliza
   debio_detectarse INTEGER NOT NULL DEFAULT 1,       -- juicio único de la hoja de visita
-  cerrado_en_siguiente INTEGER                        -- NULL = aún no revisado en visita siguiente
+  cerrado_en_siguiente INTEGER,                       -- NULL = no revisado en la visita siguiente; 1/0 = veredicto en esa visita (es lo que puntúa)
+  cerrado_fecha TEXT                                  -- fecha en que se dio por cerrado, aunque fuera más tarde (seguimiento, no puntúa)
 );
 -- KPI 6
 CREATE TABLE IF NOT EXISTS fichas_misterioso (
@@ -102,8 +104,10 @@ CREATE TABLE IF NOT EXISTS compromisos (
 );
 CREATE TABLE IF NOT EXISTS cualitativa (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL,
-  anticipacion INTEGER, analisis INTEGER, liderazgo INTEGER, equipo INTEGER,
-  ejemplos TEXT, evaluador TEXT, ts TEXT NOT NULL,
+  nota REAL,                 -- 1–10 con un decimal
+  justificacion TEXT,        -- obligatoria: en qué se basa la nota
+  anticipacion INTEGER, analisis INTEGER, liderazgo INTEGER, equipo INTEGER, ejemplos TEXT, -- rúbrica anterior, sin uso
+  evaluador TEXT, ts TEXT NOT NULL,
   PRIMARY KEY (local_id, periodo_id)
 );
 -- Descuentos (condición de validez residual) y coste de personal (medido, no puntúa)
@@ -143,8 +147,16 @@ export function abrir(ruta = process.env.INCENTIVOS_DB ?? new URL('./incentivos.
   const db = new DatabaseSync(ruta);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   db.exec(ESQUEMA);
-  // Migración: bases creadas antes de añadir la escala de cuatro puntos no tienen esta columna.
-  try { db.exec('ALTER TABLE niveles ADD COLUMN llave REAL'); } catch { /* ya existía */ }
+  // Migraciones para bases creadas con esquemas anteriores (SQLite no tiene ADD COLUMN IF NOT EXISTS).
+  for (const sql of [
+    'ALTER TABLE niveles ADD COLUMN llave REAL',
+    'ALTER TABLE hallazgos ADD COLUMN cerrado_fecha TEXT',
+    'ALTER TABLE cualitativa ADD COLUMN nota REAL',
+    'ALTER TABLE cualitativa ADD COLUMN justificacion TEXT',
+    'ALTER TABLE config_periodo ADD COLUMN fecha_alta TEXT',
+    'ALTER TABLE config_periodo ADD COLUMN fecha_baja TEXT',
+    'ALTER TABLE config_periodo ADD COLUMN dias_it INTEGER NOT NULL DEFAULT 0',
+  ]) { try { db.exec(sql); } catch { /* ya existía */ } }
   return db;
 }
 

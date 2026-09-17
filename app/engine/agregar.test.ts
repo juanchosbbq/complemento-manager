@@ -3,28 +3,27 @@ import { ConfigPeriodo, DatosPeriodo, MesDatos, agregar, construirEntrada } from
 import { liquidar } from './liquidar';
 
 const mes = (m: string, o: Partial<MesDatos> = {}): MesDatos => ({
-  mes: m, facturacionReal: 100000, facturacionObjetivo: 100000, tickets: 5000, ticketsPrevistos: 5000, ticketMedioObjetivo: 20,
+  mes: m, facturacionReal: 100000, facturacionObjetivo: 100000, tickets: 5000,
   productosPenetracion: 30, resenasVolumen: 40, resenasObjetivo: 40, resenasNotaMedia: 4.6, ...o,
 });
 const vacio = (): DatosPeriodo => ({
   meses: [], uber: [], checklist: [], hallazgos: [], fichas: [], compromisos: { iniciativasTotal: 0, iniciativasEnPlazo: 0, reportesTotal: 0, reportesEnFecha: 0 },
-  cualitativa: 6, descuentos: [], neutralizaciones: [],
+  cualitativa: 8, descuentos: [], neutralizaciones: [],
 });
 const cfg = (o: Partial<ConfigPeriodo> = {}): ConfigPeriodo => ({
   importeObjetivo: 1500, perfilCanal: 'MIXTO',
   niveles: {
-    K1_FACTURACION: { umbral: 92, objetivo: 100, excelencia: 108 },
-    K2_TICKET: { umbral: 95, objetivo: 100, excelencia: 105 },
+    K1_FACTURACION: { umbral: 240000, llave: 285000, objetivo: 300000, excelencia: 330000 }, // € del trimestre
+    K2_TICKET: { umbral: 18, llave: 19.5, objetivo: 20, excelencia: 21 },                        // €
     K3_PRODUCTOS: { umbral: 25, objetivo: 30, excelencia: 35 },
-    K4A_RESENAS_VOLUMEN: { umbral: 80, objetivo: 100, excelencia: 130 },
+    K4A_RESENAS_VOLUMEN: { umbral: 90, llave: 110, objetivo: 120, excelencia: 150 }, // reseñas del trimestre
     K4B_RESENAS_NOTA: { umbral: 4.3, objetivo: 4.5, excelencia: 4.7 },
     K5_RATING_UBER: { umbral: 4.3, objetivo: 4.5, excelencia: 4.7 },
-    K6A_MISTERIOSO_SALA: { umbral: 70, objetivo: 85, excelencia: 95 },
-    K6B_MISTERIOSO_PRODUCTO: { umbral: 70, objetivo: 85, excelencia: 95 },
+    K6A_MISTERIOSO_SALA: { umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+    K6B_MISTERIOSO_PRODUCTO: { umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
     K7_PRECISION: { umbral: 3, objetivo: 2, excelencia: 1.2 },
     K8_COCINA: { umbral: 2, objetivo: 1.2, excelencia: 0.6 },
-    K9_ONLINE: { umbral: 95, objetivo: 98, excelencia: 99.5 },
-    K9_UNFULFILLED: { umbral: 2, objetivo: 1, excelencia: 0.5 },
+    K9_DISPONIBILIDAD: { umbral: 0, objetivo: 100, excelencia: 100 },
     K10_CHECKLIST: { umbral: 80, objetivo: 95, excelencia: 100 },
     K11_HALLAZGOS: { umbral: 60, objetivo: 85, excelencia: 100 },
     K12A_INICIATIVAS: { umbral: 70, objetivo: 90, excelencia: 100 },
@@ -35,34 +34,41 @@ const cfg = (o: Partial<ConfigPeriodo> = {}): ConfigPeriodo => ({
   prorrateo: 1, bajaVoluntaria: false, ...o,
 });
 
-describe('KPIs mensualizados: objetivos por mes, logro sobre agregados (decisión 2)', () => {
-  it('facturación: suma de reales sobre suma de objetivos, no media de logros mensuales', () => {
+describe('Facturación, ticket y reseñas en valor absoluto contra niveles del trimestre', () => {
+  it('facturación: suma de los meses con dato, en €', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { facturacionReal: 80000, facturacionObjetivo: 100000 }), mes('2026-11', { facturacionReal: 100000 }), mes('2026-12', { facturacionReal: 150000, facturacionObjetivo: 130000 })];
+    d.meses = [mes('2026-10', { facturacionReal: 80000 }), mes('2026-11', { facturacionReal: 100000 }), mes('2026-12', { facturacionReal: 150000 })];
     const a = agregar(d, cfg());
-    expect(a.valores.K1_FACTURACION.valor).toBe(100); // 330 / 330
+    expect(a.valores.K1_FACTURACION.valor).toBe(330000);
+    expect(a.escalaNiveles.K1_FACTURACION).toBe(1);
   });
-  it('acumulado a fecha: solo los meses con dato', () => {
+  it('acumulado a fecha: los niveles se prorratean con el reparto mensual del objetivo, no a partes iguales', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { facturacionReal: 90000 }), mes('2026-11', { facturacionReal: null, tickets: null }), mes('2026-12', { facturacionReal: null, tickets: null })];
-    expect(agregar(d, cfg()).valores.K1_FACTURACION.valor).toBe(90);
+    // reparto 25 / 25 / 50: con solo octubre cargado, los niveles se escalan al 25%
+    d.meses = [mes('2026-10', { facturacionReal: 70000, facturacionObjetivo: 75000 }), mes('2026-11', { facturacionReal: null, tickets: null, facturacionObjetivo: 75000 }), mes('2026-12', { facturacionReal: null, tickets: null, facturacionObjetivo: 150000 })];
+    const { entrada, agregados } = construirEntrada(d, cfg());
+    expect(agregados.escalaNiveles.K1_FACTURACION).toBe(0.25);
+    expect(entrada.kpis.K1_FACTURACION!.niveles).toEqual({ umbral: 60000, llave: 71250, objetivo: 75000, excelencia: 82500 });
+    const r = liquidar(entrada);
+    expect(r.kpis.find(k => k.id === 'K1_FACTURACION')!.logro).toBeCloseTo(50 + 40 * (10000 / 11250), 0);
   });
-  it('ticket medio: real del trimestre contra objetivo ponderado por tickets previstos', () => {
+  it('sin reparto mensual, se prorratea por meses transcurridos', () => {
     const d = vacio();
-    d.meses = [
-      mes('2026-10', { facturacionReal: 90000, tickets: 5000, ticketsPrevistos: 5000, ticketMedioObjetivo: 18 }),   // real 18
-      mes('2026-12', { facturacionReal: 220000, tickets: 10000, ticketsPrevistos: 10000, ticketMedioObjetivo: 22 }), // real 22
-    ];
+    d.meses = [mes('2026-10', { facturacionObjetivo: 0 }), mes('2026-11', { facturacionReal: null, tickets: null, facturacionObjetivo: 0 }), mes('2026-12', { facturacionReal: null, tickets: null, facturacionObjetivo: 0 })];
+    expect(agregar(d, cfg()).escalaNiveles.K1_FACTURACION).toBeCloseTo(1 / 3, 6);
+  });
+  it('ticket medio: facturación acumulada entre tickets acumulados, sin prorrateo', () => {
+    const d = vacio();
+    d.meses = [mes('2026-10', { facturacionReal: 90000, tickets: 5000 }), mes('2026-12', { facturacionReal: 220000, tickets: 10000 })];
     const a = agregar(d, cfg());
-    expect(a.aux.ticketMedioReal).toBeCloseTo(20.67, 2);      // 310000 / 15000
-    expect(a.aux.ticketMedioObjetivo).toBeCloseTo(20.67, 2);  // (18×5000 + 22×10000) / 15000
-    expect(a.valores.K2_TICKET.valor).toBe(100);
+    expect(a.valores.K2_TICKET.valor).toBeCloseTo(20.67, 2); // 310000 / 15000
+    expect(a.escalaNiveles.K2_TICKET).toBeUndefined();
   });
   it('reseñas: volumen acumulado y nota media de todas las reseñas, no media de medias', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { resenasVolumen: 10, resenasObjetivo: 40, resenasNotaMedia: 3 }), mes('2026-11', { resenasVolumen: 90, resenasObjetivo: 40, resenasNotaMedia: 5 })];
+    d.meses = [mes('2026-10', { resenasVolumen: 10, resenasNotaMedia: 3 }), mes('2026-11', { resenasVolumen: 90, resenasNotaMedia: 5 })];
     const a = agregar(d, cfg());
-    expect(a.valores.K4A_RESENAS_VOLUMEN.valor).toBe(125);
+    expect(a.valores.K4A_RESENAS_VOLUMEN.valor).toBe(100);
     expect(a.valores.K4B_RESENAS_NOTA.valor).toBe(4.8); // (10×3 + 90×5)/100, no 4,0
     expect(a.condiciones.notaBajoSuelo).toBe(false);
   });
@@ -122,11 +128,14 @@ describe('Uber Eats', () => {
     expect(a.valores.K8_COCINA.valor).toBe(1.75);
     expect(a.valores.K5_RATING_UBER.valor).toBe(4.7);
   });
-  it('disponibilidad: el peor logro de Online Rate y Unfulfilled', () => {
+  it('disponibilidad es binaria: Online Rate ≥ objetivo → 100, si no → 0', () => {
     const d = vacio();
-    d.uber = [{ mes: '2026-10', pedidos: 100, inaccurateRate: 1, foodQualityRate: 0, prepDelayRate: 0, onlineRate: 99.5, unfulfilledRate: 2, rating: 4.5 }];
-    const a = agregar(d, cfg());
-    expect(a.valores.K9_DISPONIBILIDAD.valor).toBe(50); // online 120, unfulfilled 50 → 50
+    d.uber = [{ mes: '2026-10', pedidos: 100, inaccurateRate: 1, foodQualityRate: 0, prepDelayRate: 0, onlineRate: 99.5, unfulfilledRate: null, rating: 4.5 }];
+    expect(agregar(d, cfg()).valores.K9_DISPONIBILIDAD.valor).toBe(0);
+    d.uber[0].onlineRate = 100;
+    expect(agregar(d, cfg()).valores.K9_DISPONIBILIDAD.valor).toBe(100);
+    const { entrada } = construirEntrada(d, cfg());
+    expect(liquidar(entrada).kpis.find(k => k.id === 'K9_DISPONIBILIDAD')!.logro).toBe(100);
   });
 });
 
@@ -149,10 +158,10 @@ describe('Descuentos y compromisos', () => {
 describe('Cliente misterioso', () => {
   it('cuenta fichas y consumición', () => {
     const d = vacio();
-    d.fichas = [{ fecha: '2026-10-10', sala: 90, producto: null }, { fecha: '2026-11-10', sala: 80, producto: 70 }];
+    d.fichas = [{ fecha: '2026-10-10', sala: 9, producto: null }, { fecha: '2026-11-10', sala: 8, producto: 7 }];
     const a = agregar(d, cfg());
-    expect(a.valores.K6A_MISTERIOSO_SALA.valor).toBe(85);
-    expect(a.valores.K6B_MISTERIOSO_PRODUCTO.valor).toBe(70);
+    expect(a.valores.K6A_MISTERIOSO_SALA.valor).toBe(8.5);
+    expect(a.valores.K6B_MISTERIOSO_PRODUCTO.valor).toBe(7);
     expect(a.condiciones.fichasMisterioso).toBe(2);
     expect(a.condiciones.hayConsumicion).toBe(true);
   });
@@ -164,7 +173,7 @@ describe('Extremo a extremo: datos brutos → liquidación', () => {
     d.meses = ['2026-10', '2026-11', '2026-12'].map(m => mes(m));
     d.uber = ['2026-10', '2026-11', '2026-12'].map(m => ({ mes: m, pedidos: 1000, inaccurateRate: 2, foodQualityRate: 0.6, prepDelayRate: 0.6, onlineRate: 98, unfulfilledRate: 1, rating: 4.5 }));
     d.checklist = ['A', 'B'].flatMap(h => [1, 2, 3, 4, 5].map(i => ({ semana: '2026-W41', hoja: h as 'A' | 'B', lineaId: h + i, estado: 'CONFORME' as const, avisoEn24h: false, hallazgoNoReportado: false })));
-    d.fichas = [{ fecha: '2026-10-10', sala: 85, producto: 85 }, { fecha: '2026-11-10', sala: 85, producto: null }];
+    d.fichas = [{ fecha: '2026-10-10', sala: 8, producto: 8 }, { fecha: '2026-11-10', sala: 8, producto: null }];
     d.compromisos = { iniciativasTotal: 2, iniciativasEnPlazo: 2, reportesTotal: 13, reportesEnFecha: 13 };
     d.descuentos = [{ mes: '2026-10', ventas: 100000, noTipificados: 0 }];
     const { entrada } = construirEntrada(d, cfg());
@@ -172,6 +181,6 @@ describe('Extremo a extremo: datos brutos → liquidación', () => {
     expect(r.llavesCumplidas).toBe(4);
     expect(r.logroPonderado).toBeGreaterThan(100); // checklist al 100 = excelencia, reportes al 100 = excelencia
     expect(r.pago).toBeGreaterThan(1500);
-    expect(r.kpis.find(k => k.id === 'K1_FACTURACION')!.notas.join(' ')).toMatch(/300000 € reales/);
+    expect(r.kpis.find(k => k.id === 'K1_FACTURACION')!.valor).toBe(300000);
   });
 });

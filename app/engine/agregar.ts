@@ -3,24 +3,24 @@
  * en los valores agregados que consume liquidar(). También puro.
  *
  * Reglas de la sesión del 14-sep-2026:
- *  - KPIs mensualizados (1, 2, 4a): objetivos por mes, logro sobre agregados del trimestre.
+ *  - Facturación, ticket medio y reseñas se comparan en valor absoluto contra los niveles del trimestre (€, €, nº).
+ *    Para el acumulado a fecha, los niveles de facturación y reseñas se prorratean con el reparto mensual del objetivo
+ *    (o, si no hay reparto, por meses transcurridos). El ticket medio y la nota son ratios: no se prorratean.
  *  - Nota de reseñas: media de todas las reseñas del periodo (no media de medias).
  *  - Fiabilidad del checklist: líneas válidas / totales por hoja, computa la peor hoja.
  *  - KPI 11: sin hallazgos → 100%; hallazgo sin visita siguiente dentro del periodo → no cuenta.
  */
 import { KpiId, MotivoNeutralizacion, NIVELES_CUALITATIVA, PerfilCanal } from './modelo';
-import { EntradaLiquidacion, Niveles, Puertas, ValorKpi, logroKpi } from './liquidar';
+import { EntradaLiquidacion, Niveles, Puertas, ValorKpi } from './liquidar';
 
 export interface MesDatos {
   mes: string;                         // 'YYYY-MM'
   facturacionReal: number | null;      // € netos
-  facturacionObjetivo: number;         // € netos, comunicado a T−15
-  tickets: number | null;
-  ticketsPrevistos: number;
-  ticketMedioObjetivo: number;         // €
+  facturacionObjetivo: number;         // € netos: reparto mensual del objetivo, solo para prorratear el seguimiento a fecha
+  tickets: number | null;              // nº de tickets/comandas del mes, para el ticket medio
   productosPenetracion: number | null; // % de tickets con producto estratégico
   resenasVolumen: number | null;
-  resenasObjetivo: number;
+  resenasObjetivo: number;             // reparto mensual, solo para prorratear el seguimiento a fecha
   resenasNotaMedia: number | null;     // 1–5, media del mes
 }
 
@@ -81,10 +81,7 @@ export interface DatosPeriodo {
 export interface ConfigPeriodo {
   importeObjetivo: number;
   perfilCanal: PerfilCanal;
-  niveles: Partial<Record<KpiId, Niveles>> & {
-    K9_ONLINE?: Niveles;      // Online Rate (mayor mejor)
-    K9_UNFULFILLED?: Niveles; // Unfulfilled Order Rate (menor mejor)
-  };
+  niveles: Partial<Record<KpiId, Niveles>>;
   sueloNotaResenas: number;
   umbralDescuentosPct: number;    // 0,3
   puertas: Puertas;
@@ -106,6 +103,8 @@ function mediaPonderada(pares: [number | null, number | null][]): number | null 
 
 export interface Agregados {
   valores: Record<KpiId, { valor: number | null; detalle: string }>;
+  /** fracción del trimestre que representan los meses con dato; se aplica a los niveles absolutos de K1 y K4a */
+  escalaNiveles: Partial<Record<KpiId, number>>;
   condiciones: EntradaLiquidacion['condiciones'];
   aux: {
     ticketMedioReal: number | null; ticketMedioObjetivo: number | null;
@@ -118,20 +117,25 @@ export interface Agregados {
 
 export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   const conDato = d.meses.filter(m => m.facturacionReal !== null);
-  // KPI 1
-  const factReal = sum(conDato.map(m => m.facturacionReal));
-  const factObj = sum(conDato.map(m => m.facturacionObjetivo));
-  const k1 = pct(factReal, factObj);
-  // KPI 2
+  const nMeses = d.meses.length || 1;
+  /** fracción del trimestre cubierta por los meses con dato, según el reparto mensual del objetivo (o por meses si no hay reparto) */
+  const fraccion = (obj: (m: MesDatos) => number, conDato: MesDatos[]) => {
+    const total = sum(d.meses.map(obj));
+    return total > 0 ? sum(conDato.map(obj)) / total : conDato.length / nMeses;
+  };
+  // KPI 1: facturación acumulada (€) contra niveles del trimestre prorrateados a fecha
+  const k1 = conDato.length ? sum(conDato.map(m => m.facturacionReal)) : null;
+  const f1 = fraccion(m => m.facturacionObjetivo, conDato);
+  // KPI 2: ticket medio real del trimestre (€); es un ratio, no se prorratea
   const mesesTicket = d.meses.filter(m => m.facturacionReal !== null && m.tickets !== null && m.tickets > 0);
   const ticketReal = mesesTicket.length ? sum(mesesTicket.map(m => m.facturacionReal)) / sum(mesesTicket.map(m => m.tickets)) : null;
-  const ticketObj = mediaPonderada(mesesTicket.map(m => [m.ticketMedioObjetivo, m.ticketsPrevistos]));
-  const k2 = ticketReal !== null && ticketObj ? (ticketReal / ticketObj) * 100 : null;
+  const k2 = ticketReal;
   // KPI 3 (ponderado por tickets)
   const k3 = mediaPonderada(d.meses.map(m => [m.productosPenetracion, m.tickets]));
   // KPI 4
   const mesesRes = d.meses.filter(m => m.resenasVolumen !== null);
-  const k4a = pct(sum(mesesRes.map(m => m.resenasVolumen)), sum(mesesRes.map(m => m.resenasObjetivo)));
+  const k4a = mesesRes.length ? sum(mesesRes.map(m => m.resenasVolumen)) : null;
+  const f4 = fraccion(m => m.resenasObjetivo, mesesRes);
   const k4b = mediaPonderada(mesesRes.map(m => [m.resenasNotaMedia, m.resenasVolumen]));
   const notaBajoSuelo = k4b !== null && k4b < cfg.sueloNotaResenas;
   // Uber (ponderado por pedidos; si no hay pedidos, media simple)
@@ -144,17 +148,11 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   const k5 = uberPond(u => u.rating);
   const k7 = uberPond(u => u.inaccurateRate);
   const k8 = uberPond(u => (u.foodQualityRate === null && u.prepDelayRate === null ? null : (u.foodQualityRate ?? 0) + (u.prepDelayRate ?? 0)));
+  // KPI 9 binario: Online Rate del periodo ≥ objetivo → 100; si no → 0 (salvo neutralización por parada justificada)
   const online = uberPond(u => u.onlineRate);
-  const unfulfilled = uberPond(u => u.unfulfilledRate);
-  let k9: number | null = null;
-  let k9detalle = 'Sin dato de Online Rate ni Unfulfilled Order Rate';
-  if (online !== null || unfulfilled !== null) {
-    const lo = online !== null && cfg.niveles.K9_ONLINE ? logroKpi(online, cfg.niveles.K9_ONLINE, 'mayor') : null;
-    const lu = unfulfilled !== null && cfg.niveles.K9_UNFULFILLED ? logroKpi(unfulfilled, cfg.niveles.K9_UNFULFILLED, 'menor') : null;
-    const ls = [lo, lu].filter((x): x is number => x !== null);
-    k9 = ls.length ? Math.min(...ls) : null;
-    k9detalle = `Online Rate ${r1(online) ?? '—'}% (logro ${r1(lo) ?? '—'}) · Unfulfilled ${r2(unfulfilled) ?? '—'}% (logro ${r1(lu) ?? '—'}) → computa el peor`;
-  }
+  const objetivoOnline = cfg.niveles.K9_DISPONIBILIDAD?.objetivo ?? 100;
+  const k9 = online === null ? null : (online >= objetivoOnline ? 100 : 0);
+  const k9detalle = online === null ? 'Sin dato de Online Rate' : `Online Rate ${r2(online)}% · objetivo ${objetivoOnline}% → ${online >= objetivoOnline ? 'cumple' : 'no cumple (0)'}`;
   // KPI 6
   const k6a = d.fichas.length ? sum(d.fichas.map(f => f.sala)) / d.fichas.length : null;
   const conProducto = d.fichas.filter(f => f.producto !== null);
@@ -183,10 +181,10 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   });
 
   const valores: Agregados['valores'] = {
-    K1_FACTURACION: { valor: r1(k1), detalle: `${Math.round(factReal)} € reales sobre ${Math.round(factObj)} € de objetivo acumulado (${conDato.length} mes/es)` },
-    K2_TICKET: { valor: r1(k2), detalle: `Ticket medio real ${r2(ticketReal) ?? '—'} € sobre objetivo ponderado ${r2(ticketObj) ?? '—'} €` },
+    K1_FACTURACION: { valor: r2(k1), detalle: `${conDato.length} de ${nMeses} meses con dato${f1 < 1 ? ` · niveles prorrateados al ${Math.round(f1 * 100)}% del trimestre` : ''}` },
+    K2_TICKET: { valor: r2(k2), detalle: `Facturación acumulada / tickets acumulados (${sum(mesesTicket.map(m => m.tickets))} tickets)` },
     K3_PRODUCTOS: { valor: r1(k3), detalle: 'Penetración ponderada por tickets del periodo' },
-    K4A_RESENAS_VOLUMEN: { valor: r1(k4a), detalle: `${sum(mesesRes.map(m => m.resenasVolumen))} reseñas sobre ${sum(mesesRes.map(m => m.resenasObjetivo))} de objetivo acumulado` },
+    K4A_RESENAS_VOLUMEN: { valor: k4a, detalle: `${mesesRes.length} de ${nMeses} meses con dato${f4 < 1 ? ` · niveles prorrateados al ${Math.round(f4 * 100)}% del trimestre` : ''}` },
     K4B_RESENAS_NOTA: { valor: r2(k4b), detalle: `Media de todas las reseñas del periodo · suelo ${cfg.sueloNotaResenas}` },
     K5_RATING_UBER: { valor: r2(k5), detalle: 'Rating del periodo ponderado por pedidos' },
     K6A_MISTERIOSO_SALA: { valor: r1(k6a), detalle: `${d.fichas.length} ficha(s) en el trimestre` },
@@ -198,11 +196,12 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
     K11_HALLAZGOS: { valor: r1(k11), detalle: evaluables.length ? `${cerrados} de ${evaluables.length} hallazgos cerrados en la visita siguiente` : 'Sin hallazgos evaluables en el periodo: 100%' },
     K12A_INICIATIVAS: { valor: r1(k12a), detalle: `${c.iniciativasEnPlazo} de ${c.iniciativasTotal} iniciativas en plazo` },
     K12B_REPORTES: { valor: r1(k12b), detalle: `${c.reportesEnFecha} de ${c.reportesTotal} reportes en fecha` },
-    K13_CUALITATIVA: { valor: d.cualitativa, detalle: 'Rúbrica de cuatro criterios, 0–2 cada uno' },
+    K13_CUALITATIVA: { valor: d.cualitativa, detalle: 'Nota 1–10 de dirección con justificación escrita, al cierre del trimestre' },
   };
 
   return {
     valores,
+    escalaNiveles: { K1_FACTURACION: f1, K4A_RESENAS_VOLUMEN: f4 },
     condiciones: {
       descuentosExcedidos: descuentosPorMes.some(x => x.excedido),
       fichasMisterioso: d.fichas.length,
@@ -210,7 +209,7 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
       notaBajoSuelo,
     },
     aux: {
-      ticketMedioReal: r2(ticketReal), ticketMedioObjetivo: r2(ticketObj), notaMediaTrimestre: r2(k4b),
+      ticketMedioReal: r2(ticketReal), ticketMedioObjetivo: null, notaMediaTrimestre: r2(k4b),
       fiabilidadA: r1(fA), fiabilidadB: r1(fB), descuentosPorMes,
       hallazgosEvaluables: evaluables.length, hallazgosCerrados: cerrados,
     },
@@ -219,15 +218,20 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
 
 /** Niveles por defecto para KPIs cuya escala es fija por construcción. */
 export const NIVELES_FIJOS: Partial<Record<KpiId, Niveles>> = {
-  K9_DISPONIBILIDAD: { umbral: 50, objetivo: 100, excelencia: 120 }, // el valor ya es un logro
   K13_CUALITATIVA: NIVELES_CUALITATIVA,
 };
+/** K9 es binario: el valor agregado ya es 0 o 100, se pasa por una escala identidad. */
+const NIVELES_K9_IDENTIDAD: Niveles = { umbral: 50, objetivo: 100, excelencia: 120 };
 
 export function construirEntrada(d: DatosPeriodo, cfg: ConfigPeriodo): { entrada: EntradaLiquidacion; agregados: Agregados } {
   const ag = agregar(d, cfg);
   const kpis: Partial<Record<KpiId, ValorKpi>> = {};
   for (const id of Object.keys(ag.valores) as KpiId[]) {
-    const niveles = cfg.niveles[id] ?? NIVELES_FIJOS[id];
+    let niveles = id === 'K9_DISPONIBILIDAD' ? NIVELES_K9_IDENTIDAD : (cfg.niveles[id] ?? NIVELES_FIJOS[id]);
+    const f = ag.escalaNiveles[id];
+    if (niveles && f !== undefined && f < 1) {
+      niveles = { umbral: niveles.umbral * f, objetivo: niveles.objetivo * f, excelencia: niveles.excelencia * f, llave: niveles.llave !== undefined ? niveles.llave * f : undefined };
+    }
     const n = d.neutralizaciones.find(x => x.kpi === id);
     kpis[id] = {
       valor: ag.valores[id].valor,

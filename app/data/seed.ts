@@ -1,8 +1,8 @@
 /**
  * Sembrado inicial. Ejecutar: npm run seed
  *   - Maestros reales: locales del piloto (sin nombre real), Valladolid excluido, periodo Q4 2026, catálogo de líneas de checklist.
- *   - TODO LO DEMÁS ES ILUSTRATIVO (autor 'ILUSTRATIVO'): niveles y datos de octubre para ver la herramienta funcionando.
- *     Sustituir por los umbrales de las cartas de objetivos y por los datos reales antes del 1 de octubre.
+ *   - Configuración base (importe, perfil, suelo, umbral de descuentos). Los umbrales por KPI se cargan desde la carta de cada local.
+ *   - Con --ejemplo, además datos de EJEMPLO en Local 1 (autor 'ILUSTRATIVO') para ver la herramienta funcionando.
  */
 import { abrir } from './db';
 import * as repo from './repo';
@@ -33,55 +33,47 @@ const st = db.prepare('INSERT INTO lineas_catalogo (hoja, linea_id, texto, orden
 A.forEach((t, i) => st.run('A', `A${i + 1}`, t, i + 1));
 B.forEach((t, i) => st.run('B', `B${i + 1}`, t, i + 1));
 
-// ---- Configuración ILUSTRATIVA por local ----
-const nivelesBase = [
-  { kpi: 'K1_FACTURACION', umbral: 92, objetivo: 100, excelencia: 108 },
-  { kpi: 'K2_TICKET', umbral: 95, objetivo: 100, excelencia: 105 },
-  { kpi: 'K3_PRODUCTOS', umbral: 25, objetivo: 30, excelencia: 36 },
-  { kpi: 'K4A_RESENAS_VOLUMEN', umbral: 80, objetivo: 100, excelencia: 130 },
-  { kpi: 'K4B_RESENAS_NOTA', umbral: 4.3, objetivo: 4.5, excelencia: 4.7 },
-  { kpi: 'K5_RATING_UBER', umbral: 4.2, objetivo: 4.4, excelencia: 4.6 },
-  { kpi: 'K6A_MISTERIOSO_SALA', umbral: 70, objetivo: 85, excelencia: 95 },
-  { kpi: 'K6B_MISTERIOSO_PRODUCTO', umbral: 70, objetivo: 85, excelencia: 95 },
-  { kpi: 'K7_PRECISION', umbral: 3.0, objetivo: 2.0, excelencia: 1.2 },
-  { kpi: 'K8_COCINA', umbral: 2.0, objetivo: 1.2, excelencia: 0.6 },
-  { kpi: 'K9_ONLINE', umbral: 95, objetivo: 98, excelencia: 99.5 },
-  { kpi: 'K9_UNFULFILLED', umbral: 2.0, objetivo: 1.0, excelencia: 0.5 },
-  { kpi: 'K10_CHECKLIST', umbral: 80, objetivo: 95, excelencia: 100 },
-  { kpi: 'K11_HALLAZGOS', umbral: 60, objetivo: 85, excelencia: 100 },
-  { kpi: 'K12A_INICIATIVAS', umbral: 70, objetivo: 90, excelencia: 100 },
-  { kpi: 'K12B_REPORTES', umbral: 80, objetivo: 95, excelencia: 100 },
-];
+// ---- Configuración base por local: importe y parámetros ya decididos; los umbrales se cargan desde la carta de cada local ----
 for (const l of ['L1', 'L2', 'L3']) {
-  repo.guardarConfig(db, l, 'Q4-2026', { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4.2, umbral_descuentos_pct: 0.3, productos_estrategicos: 'Pendiente de fijar (máx. 3 SKUs)' }, ILU);
-  repo.guardarNiveles(db, l, 'Q4-2026', nivelesBase, ILU);
-  repo.guardarPuertas(db, l, 'Q4-2026', { seguridad_alimentaria: 1, reporting_semanas_en_plazo: null, control_caja: 1, integridad: 1 }, ILU);
-  // Objetivos mensualizados ILUSTRATIVOS (los reales salen de los baselines y la estacionalidad)
-  const obj: Record<string, [number, number, number]> = { L1: [200000, 205000, 240000], L2: [140000, 145000, 175000], L3: [120000, 125000, 150000] };
-  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) => {
-    repo.guardarMes(db, l, 'Q4-2026', { mes, facturacion_objetivo: obj[l][i], tickets_previstos: Math.round(obj[l][i] / 21), ticket_medio_objetivo: 21, resenas_objetivo: 45 }, ILU);
-  });
+  repo.guardarConfig(db, l, 'Q4-2026', { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4, umbral_descuentos_pct: 0.3 }, 'seed');
+  repo.guardarPuertas(db, l, 'Q4-2026', { seguridad_alimentaria: 1, reporting_semanas_en_plazo: null, control_caja: 1, integridad: 1 }, 'seed');
 }
 
-// ---- Datos ILUSTRATIVOS de octubre en Local 1, para ver la herramienta funcionando ----
-repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 206500, facturacion_objetivo: 200000, tickets: 9700, tickets_previstos: 9524, ticket_medio_objetivo: 21, productos_penetracion: 31.5, resenas_volumen: 52, resenas_objetivo: 45, resenas_nota_media: 4.6 }, ILU);
-repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.5, prep_delay_rate: 0.4, online_rate: 98.6, unfulfilled_rate: 0.8, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
-repo.guardarDescuentosMes(db, 'L1', 'Q4-2026', { mes: '2026-10', ventas: 206500, no_tipificados: 120 }, ILU);
-repo.guardarCostePersonalMes(db, 'L1', 'Q4-2026', { mes: '2026-10', coste_sala: 39200, ventas: 206500, horas_sala: 1840 }, ILU);
-const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
-for (const s of semanas) {
-  repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map((_, i) => ({ linea_id: `A${i + 1}`, estado: 'CONFORME', aviso_en_24h: false })));
-  repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'B', 'Manager Local 1', 'Jefe de Cocina 1',
-    B.map((_, i) => ({ linea_id: `B${i + 1}`, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
+// ---- Datos de EJEMPLO, solo con --ejemplo: para ver la herramienta funcionando en Local 1 ----
+if (process.argv.includes('--ejemplo')) {
+  repo.guardarNiveles(db, 'L1', 'Q4-2026', [
+    { kpi: 'K1_FACTURACION', umbral: 166631.89, llave: 235147.71, objetivo: 277719.81, excelencia: 305491.79 },
+    { kpi: 'K2_TICKET', umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 },
+    { kpi: 'K3_PRODUCTOS', umbral: 7, llave: 10.5, objetivo: 14, excelencia: 18 },
+    { kpi: 'K4A_RESENAS_VOLUMEN', umbral: 125, llave: 200, objetivo: 250, excelencia: 325 },
+    { kpi: 'K4B_RESENAS_NOTA', umbral: 4, llave: 4.5, objetivo: 4.75, excelencia: 4.9 },
+    { kpi: 'K5_RATING_UBER', umbral: 4.3, llave: 4.4, objetivo: 4.5, excelencia: 4.7 },
+    { kpi: 'K6A_MISTERIOSO_SALA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+    { kpi: 'K6B_MISTERIOSO_PRODUCTO', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+    { kpi: 'K7_PRECISION', umbral: 2.4, llave: 1.9, objetivo: 1.0, excelencia: 0.6 },
+    { kpi: 'K8_COCINA', umbral: 0.3, llave: 0.2, objetivo: 0.1, excelencia: 0 },
+    { kpi: 'K9_DISPONIBILIDAD', umbral: 0, objetivo: 100, excelencia: 100 },
+    { kpi: 'K10_CHECKLIST', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
+    { kpi: 'K11_HALLAZGOS', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
+    { kpi: 'K12A_INICIATIVAS', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
+    { kpi: 'K12B_REPORTES', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
+    { kpi: 'K13_CUALITATIVA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+  ], ILU);
+  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) => repo.guardarMes(db, 'L1', 'Q4-2026', { mes, facturacion_objetivo: [85000, 88000, 105000][i], resenas_objetivo: [75, 80, 95][i] }, ILU));
+  repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 87500, facturacion_objetivo: 85000, tickets: 2450, productos_penetracion: 11.2, resenas_volumen: 78, resenas_objetivo: 75, resenas_nota_media: 4.6 }, ILU);
+  repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, prep_delay_rate: 0.06, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
+  const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
+  for (const s of semanas) {
+    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map((_, i) => ({ linea_id: `A${i + 1}`, estado: 'CONFORME', aviso_en_24h: false })));
+    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'B', 'Manager Local 1', 'Jefe de Cocina 1',
+      B.map((_, i) => ({ linea_id: `B${i + 1}`, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
+  }
+  const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-08', visitante: 'Dirección A', notas: 'Visita de ejemplo', hallazgos: [{ hoja: 'B', linea_id: 'B7', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true }] });
+  const h1 = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').get(v1) as any).id;
+  repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-15', visitante: 'Dirección B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }] });
+  repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-10-18', evaluador: 'Conocido 1', sala: 8.5, producto: 8.2, detalle: 'Ficha de ejemplo' });
+  repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 41', fecha_limite: '2026-10-13', fecha_cumplido: '2026-10-13' }, ILU);
+  repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
 }
-const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-08', visitante: 'Dirección A', hallazgos: [{ hoja: 'B', linea_id: 'B7', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true }] });
-const h1 = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').get(v1) as any).id;
-repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-15', visitante: 'Dirección B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }] });
-repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-22', visitante: 'Dirección C', hallazgos: [{ hoja: 'A', linea_id: 'A3', descripcion: 'Dos focos fundidos en sala', reportado_previamente: 1, debio_detectarse: true }] });
-repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-10-18', evaluador: 'Conocido 1', sala: 88, producto: 82 });
-repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 41', fecha_limite: '2026-10-13', fecha_cumplido: '2026-10-13' }, ILU);
-repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 42', fecha_limite: '2026-10-20', fecha_cumplido: '2026-10-21' }, ILU);
-repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 43', fecha_limite: '2026-10-27', fecha_cumplido: '2026-10-27' }, ILU);
-repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
 
-console.log('Sembrado. Accesos: direccion · local1 · local2 · local3. Los datos y niveles son ILUSTRATIVOS.');
+console.log('Sembrado. Accesos: direccion · local1 · local2 · local3. Los umbrales se cargan desde la carta de cada local (Configuración).' + (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''));

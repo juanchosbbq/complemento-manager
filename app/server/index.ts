@@ -82,7 +82,9 @@ function api(c: Ctx): any {
       repo.guardarUberMes(db, r1, r2, b, autor(c), 'manual'); return { ok: true };
     case 'visita': return { ok: true, id: repo.guardarVisita(db, r1, r2, b) };
     case 'ficha': repo.guardarFicha(db, r1, r2, b); return { ok: true };
-    case 'compromiso': repo.guardarCompromiso(db, r1, r2, b, autor(c)); return { ok: true };
+    case 'compromiso':
+      if (c.metodo === 'DELETE') { repo.borrarCompromiso(db, r1, r2, Number(r3 ?? b.id)); return { ok: true }; }
+      repo.guardarCompromiso(db, r1, r2, b, autor(c)); return { ok: true };
     case 'cualitativa': repo.guardarCualitativa(db, r1, r2, b, autor(c)); return { ok: true };
     case 'descuentos': repo.guardarDescuentosMes(db, r1, r2, b, autor(c)); return { ok: true };
     case 'coste': repo.guardarCostePersonalMes(db, r1, r2, b, autor(c)); return { ok: true };
@@ -90,6 +92,7 @@ function api(c: Ctx): any {
       if (c.metodo === 'DELETE') { repo.borrarNeutralizacion(db, Number(r3 ?? b.id)); return { ok: true }; }
       repo.guardarNeutralizacion(db, r1, r2, b, autor(c)); return { ok: true };
     case 'liquidar': return repo.cerrarLiquidacion(db, r1, r2, b.fecha_extraccion ?? new Date().toISOString().slice(0, 10), autor(c));
+    case 'vaciar': if (b.confirmar !== r1) throw new HttpError(400, 'Confirmación incorrecta'); repo.vaciarDatos(db, r1, r2); return { ok: true };
   }
   throw new HttpError(404, 'Ruta desconocida');
 }

@@ -24,11 +24,23 @@ export const locales = (db: DB, soloModelo = true): Row[] =>
   all(db, `SELECT * FROM locales ${soloModelo ? 'WHERE en_modelo = 1' : ''} ORDER BY orden, nombre`);
 export const local = (db: DB, id: string) => get(db, 'SELECT * FROM locales WHERE id = ? AND en_modelo = 1', id);
 export const periodos = (db: DB) => all(db, 'SELECT * FROM periodos ORDER BY inicio DESC').map(p => ({ ...p, meses: JSON.parse(p.meses) }));
-export const periodo = (db: DB, id: string): (Row & { meses: string[] }) | undefined => { const p = get(db, 'SELECT * FROM periodos WHERE id = ?', id); return p ? { ...p, meses: JSON.parse(p.meses) as string[] } : undefined; };
+export const periodo = (db: DB, id: string): (Row & { meses: string[]; inicio: string; fin: string }) | undefined => { const p = get(db, 'SELECT * FROM periodos WHERE id = ?', id); return p ? { ...p, meses: JSON.parse(p.meses) as string[], inicio: p.inicio as string, fin: p.fin as string } : undefined; };
 export const managerDeLocal = (db: DB, localId: string) => get(db, 'SELECT * FROM managers WHERE local_id = ? AND activo = 1', localId);
 export const catalogoLineas = (db: DB) => all(db, 'SELECT * FROM lineas_catalogo ORDER BY hoja, orden');
 
 // ---------- Configuración ----------
+const diasEntre = (a: string, b: string) => Math.round((Date.parse(b + 'T00:00:00Z') - Date.parse(a + 'T00:00:00Z')) / 86400000) + 1;
+
+/** Prorrateo por días efectivos (carta §9): alta o baja dentro del periodo e incapacidad temporal de más de 15 días. */
+export function calcularProrrateo(p: { inicio: string; fin: string }, c: { fecha_alta?: string | null; fecha_baja?: string | null; dias_it?: number | null }): { prorrateo: number; diasPeriodo: number; diasEfectivos: number; diasIt: number } {
+  const diasPeriodo = diasEntre(p.inicio, p.fin);
+  const desde = c.fecha_alta && c.fecha_alta > p.inicio ? c.fecha_alta : p.inicio;
+  const hasta = c.fecha_baja && c.fecha_baja < p.fin ? c.fecha_baja : p.fin;
+  const diasIt = (c.dias_it ?? 0) > 15 ? (c.dias_it ?? 0) : 0;
+  const diasEfectivos = Math.max(0, (hasta >= desde ? diasEntre(desde, hasta) : 0) - diasIt);
+  return { prorrateo: Math.round((diasEfectivos / diasPeriodo) * 1000) / 1000, diasPeriodo, diasEfectivos, diasIt };
+}
+
 export function config(db: DB, localId: string, periodoId: string): ConfigPeriodo | null {
   const c = get(db, 'SELECT * FROM config_periodo WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
   if (!c) return null;
@@ -57,15 +69,24 @@ export function configCruda(db: DB, localId: string, periodoId: string) {
   };
 }
 
+/** Guarda la configuración del periodo. Los campos que no vengan en `c` conservan su valor actual. El prorrateo se recalcula siempre. */
 export function guardarConfig(db: DB, localId: string, periodoId: string, c: Row, autor: string) {
-  run(db, `INSERT INTO config_periodo (local_id, periodo_id, importe_objetivo, perfil_canal, suelo_nota_resenas, umbral_descuentos_pct, prorrateo, baja_voluntaria, productos_estrategicos, fecha_comunicacion, fecha_extraccion_prevista, autor, ts)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(local_id, periodo_id) DO UPDATE SET
+  const p = periodo(db, periodoId);
+  if (!p) throw new Error('Periodo desconocido');
+  const prev = get(db, 'SELECT * FROM config_periodo WHERE local_id = ? AND periodo_id = ?', localId, periodoId) ?? {};
+  const v = (k: string, def: any) => (c[k] !== undefined ? c[k] : (prev[k] !== undefined && prev[k] !== null ? prev[k] : def));
+  const sit = { fecha_alta: v('fecha_alta', null) || null, fecha_baja: v('fecha_baja', null) || null, dias_it: Number(v('dias_it', 0)) || 0 };
+  const { prorrateo } = calcularProrrateo(p, sit);
+  run(db, `INSERT INTO config_periodo (local_id, periodo_id, importe_objetivo, perfil_canal, suelo_nota_resenas, umbral_descuentos_pct, prorrateo, baja_voluntaria, fecha_alta, fecha_baja, dias_it, productos_estrategicos, fecha_comunicacion, fecha_extraccion_prevista, autor, ts)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(local_id, periodo_id) DO UPDATE SET
     importe_objetivo=excluded.importe_objetivo, perfil_canal=excluded.perfil_canal, suelo_nota_resenas=excluded.suelo_nota_resenas,
     umbral_descuentos_pct=excluded.umbral_descuentos_pct, prorrateo=excluded.prorrateo, baja_voluntaria=excluded.baja_voluntaria,
+    fecha_alta=excluded.fecha_alta, fecha_baja=excluded.fecha_baja, dias_it=excluded.dias_it,
     productos_estrategicos=excluded.productos_estrategicos, fecha_comunicacion=excluded.fecha_comunicacion,
     fecha_extraccion_prevista=excluded.fecha_extraccion_prevista, autor=excluded.autor, ts=excluded.ts`,
-    localId, periodoId, c.importe_objetivo ?? 1500, c.perfil_canal ?? 'MIXTO', c.suelo_nota_resenas ?? 4.2, c.umbral_descuentos_pct ?? 0.3,
-    c.prorrateo ?? 1, c.baja_voluntaria ? 1 : 0, c.productos_estrategicos ?? null, c.fecha_comunicacion ?? null, c.fecha_extraccion_prevista ?? null, autor, ahora());
+    localId, periodoId, v('importe_objetivo', 1500), v('perfil_canal', 'MIXTO'), v('suelo_nota_resenas', 4), v('umbral_descuentos_pct', 0.3),
+    prorrateo, v('baja_voluntaria', 0) ? 1 : 0, sit.fecha_alta, sit.fecha_baja, sit.dias_it,
+    v('productos_estrategicos', null) || null, v('fecha_comunicacion', null) || null, v('fecha_extraccion_prevista', null) || null, autor, ahora());
 }
 
 export function guardarNiveles(db: DB, localId: string, periodoId: string, niveles: { kpi: string; umbral: number; objetivo: number; excelencia: number; llave?: number }[], autor: string) {
@@ -118,10 +139,24 @@ export function guardarVisita(db: DB, localId: string, periodoId: string, v: { f
   const id = Number(r.lastInsertRowid);
   const st = db.prepare('INSERT INTO hallazgos (visita_id, hoja, linea_id, descripcion, reportado_previamente, debio_detectarse) VALUES (?,?,?,?,?,?)');
   for (const h of v.hallazgos) st.run(id, h.hoja, h.linea_id, h.descripcion ?? null, h.reportado_previamente ? 1 : 0, h.debio_detectarse === false ? 0 : 1);
-  // Cierres: en esta visita se revisa si los hallazgos de la visita anterior se cerraron
-  for (const c of v.cierres ?? []) run(db, 'UPDATE hallazgos SET cerrado_en_siguiente = ? WHERE id = ?', c.cerrado ? 1 : 0, c.hallazgo_id);
+  // Cierres: cada hallazgo abierto puede darse por cerrado (o seguir abierto) en esta visita.
+  // Solo puntúa el veredicto dado en la visita inmediatamente siguiente a la que lo detectó (cerrado_en_siguiente);
+  // un cierre posterior se registra en cerrado_fecha para el seguimiento, pero ya no cuenta como "cerrado en la visita siguiente".
+  for (const c of v.cierres ?? []) {
+    const h = get(db, 'SELECT h.*, vi.fecha AS fecha_deteccion, vi.local_id, vi.periodo_id FROM hallazgos h JOIN visitas vi ON vi.id = h.visita_id WHERE h.id = ?', c.hallazgo_id);
+    if (!h) continue;
+    const esSiguiente = !get(db, 'SELECT 1 FROM visitas WHERE local_id = ? AND periodo_id = ? AND fecha > ? AND fecha < ? AND id <> ?', h.local_id, h.periodo_id, h.fecha_deteccion, v.fecha, id)
+      && !get(db, 'SELECT 1 FROM visitas WHERE local_id = ? AND periodo_id = ? AND fecha = ? AND id > ? AND id <> ?', h.local_id, h.periodo_id, h.fecha_deteccion, h.visita_id, id);
+    if (esSiguiente && h.cerrado_en_siguiente === null) run(db, 'UPDATE hallazgos SET cerrado_en_siguiente = ? WHERE id = ?', c.cerrado ? 1 : 0, c.hallazgo_id);
+    if (c.cerrado && !h.cerrado_fecha) run(db, 'UPDATE hallazgos SET cerrado_fecha = ? WHERE id = ?', v.fecha, c.hallazgo_id);
+  }
   return id;
 }
+
+/** Hallazgos sin fecha de cierre, con la visita que los detectó. */
+export const hallazgosAbiertos = (db: DB, localId: string, periodoId: string) =>
+  all(db, `SELECT h.*, v.fecha AS fecha_deteccion, v.visitante FROM hallazgos h JOIN visitas v ON v.id = h.visita_id
+           WHERE v.local_id = ? AND v.periodo_id = ? AND h.cerrado_fecha IS NULL ORDER BY v.fecha, h.id`, localId, periodoId);
 
 export const guardarFicha = (db: DB, localId: string, periodoId: string, f: Row) =>
   run(db, 'INSERT INTO fichas_misterioso (local_id, periodo_id, fecha, evaluador, sala, producto, detalle, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, f.fecha, f.evaluador, f.sala, f.producto ?? null, f.detalle ?? null, ahora());
@@ -130,10 +165,17 @@ export const guardarCompromiso = (db: DB, localId: string, periodoId: string, c:
   c.id ? run(db, 'UPDATE compromisos SET descripcion=?, fecha_limite=?, fecha_cumplido=?, autor=?, ts=? WHERE id=?', c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora(), c.id)
        : run(db, 'INSERT INTO compromisos (local_id, periodo_id, tipo, descripcion, fecha_limite, fecha_cumplido, autor, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, c.tipo, c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora());
 
-export const guardarCualitativa = (db: DB, localId: string, periodoId: string, q: Row, evaluador: string) =>
-  run(db, `INSERT INTO cualitativa (local_id, periodo_id, anticipacion, analisis, liderazgo, equipo, ejemplos, evaluador, ts) VALUES (?,?,?,?,?,?,?,?,?)
-    ON CONFLICT(local_id, periodo_id) DO UPDATE SET anticipacion=excluded.anticipacion, analisis=excluded.analisis, liderazgo=excluded.liderazgo, equipo=excluded.equipo, ejemplos=excluded.ejemplos, evaluador=excluded.evaluador, ts=excluded.ts`,
-    localId, periodoId, q.anticipacion ?? null, q.analisis ?? null, q.liderazgo ?? null, q.equipo ?? null, JSON.stringify(q.ejemplos ?? {}), evaluador, ahora());
+export const borrarCompromiso = (db: DB, localId: string, periodoId: string, id: number) =>
+  run(db, 'DELETE FROM compromisos WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
+
+export const guardarCualitativa = (db: DB, localId: string, periodoId: string, q: Row, evaluador: string) => {
+  const nota = q.nota === null || q.nota === undefined || q.nota === '' ? null : Number(q.nota);
+  if (nota !== null && (nota < 1 || nota > 10)) throw new Error('La nota debe estar entre 1 y 10');
+  if (nota !== null && !String(q.justificacion ?? '').trim()) throw new Error('La valoración necesita una justificación escrita');
+  return run(db, `INSERT INTO cualitativa (local_id, periodo_id, nota, justificacion, evaluador, ts) VALUES (?,?,?,?,?,?)
+    ON CONFLICT(local_id, periodo_id) DO UPDATE SET nota=excluded.nota, justificacion=excluded.justificacion, evaluador=excluded.evaluador, ts=excluded.ts`,
+    localId, periodoId, nota === null ? null : Math.round(nota * 10) / 10, q.justificacion ?? null, evaluador, ahora());
+};
 
 export const guardarDescuentosMes = (db: DB, localId: string, periodoId: string, d: Row, autor: string) =>
   run(db, `INSERT INTO descuentos_mes (local_id, periodo_id, mes, ventas, no_tipificados, cauce_disciplinario_abierto, autor, ts) VALUES (?,?,?,?,?,?,?,?)
@@ -156,18 +198,20 @@ export const borrarNeutralizacion = (db: DB, id: number) => run(db, 'DELETE FROM
 export function datosPeriodo(db: DB, localId: string, periodoId: string, hastaMes?: string): DatosPeriodo {
   const p = periodo(db, periodoId);
   if (!p) throw new Error('Periodo desconocido');
-  const mesesPeriodo: string[] = p.meses.filter((m: string) => !hastaMes || m <= hastaMes);
-  const enRango = (mes: string) => mesesPeriodo.includes(mes);
+  const enRango = (mes: string) => !hastaMes || mes <= hastaMes;
   const fechaTope = hastaMes ? `${hastaMes}-31` : p.fin;
 
+  // Se devuelven todos los meses del periodo (el reparto mensual del objetivo hace falta entero para prorratear),
+  // pero los datos reales de los meses posteriores al corte van a null.
   const filasMes = all(db, 'SELECT * FROM meses WHERE local_id=? AND periodo_id=? ORDER BY mes', localId, periodoId);
-  const meses = mesesPeriodo.map(mes => {
+  const meses = (p.meses as string[]).map(mes => {
     const m = filasMes.find(x => x.mes === mes);
+    const real = enRango(mes);
     return {
-      mes, facturacionReal: m?.facturacion_real ?? null, facturacionObjetivo: m?.facturacion_objetivo ?? 0,
-      tickets: m?.tickets ?? null, ticketsPrevistos: m?.tickets_previstos ?? 0, ticketMedioObjetivo: m?.ticket_medio_objetivo ?? 0,
-      productosPenetracion: m?.productos_penetracion ?? null, resenasVolumen: m?.resenas_volumen ?? null,
-      resenasObjetivo: m?.resenas_objetivo ?? 0, resenasNotaMedia: m?.resenas_nota_media ?? null,
+      mes, facturacionReal: real ? (m?.facturacion_real ?? null) : null, facturacionObjetivo: m?.facturacion_objetivo ?? 0,
+      tickets: real ? (m?.tickets ?? null) : null,
+      productosPenetracion: real ? (m?.productos_penetracion ?? null) : null, resenasVolumen: real ? (m?.resenas_volumen ?? null) : null,
+      resenasObjetivo: m?.resenas_objetivo ?? 0, resenasNotaMedia: real ? (m?.resenas_nota_media ?? null) : null,
     };
   });
   const uber = all(db, 'SELECT * FROM uber_mes WHERE local_id=? AND periodo_id=? ORDER BY mes', localId, periodoId).filter(u => enRango(u.mes)).map(u => ({
@@ -211,7 +255,7 @@ export function datosPeriodo(db: DB, localId: string, periodoId: string, hastaMe
     reportesTotal: comps.filter(c => c.tipo === 'REPORTE').length, reportesEnFecha: comps.filter(c => c.tipo === 'REPORTE' && enPlazo(c)).length,
   };
   const q = get(db, 'SELECT * FROM cualitativa WHERE local_id=? AND periodo_id=?', localId, periodoId);
-  const cualitativa = q && [q.anticipacion, q.analisis, q.liderazgo, q.equipo].every(x => x !== null) ? q.anticipacion + q.analisis + q.liderazgo + q.equipo : null;
+  const cualitativa = q && q.nota !== null && q.nota !== undefined ? q.nota : null;
   const descuentos = all(db, 'SELECT * FROM descuentos_mes WHERE local_id=? AND periodo_id=?', localId, periodoId).filter(d => enRango(d.mes)).map(d => ({ mes: d.mes, ventas: d.ventas, noTipificados: d.no_tipificados }));
   const neutralizaciones = all(db, 'SELECT * FROM neutralizaciones WHERE local_id=? AND periodo_id=?', localId, periodoId).map(n => ({ kpi: n.kpi as KpiId, motivo: n.motivo as MotivoNeutralizacion, evidencia: n.evidencia ?? undefined }));
 
@@ -237,9 +281,9 @@ export function calcular(db: DB, localId: string, periodoId: string, hastaMes?: 
   const { entrada, agregados } = construirEntrada(datos, cfg);
   const resultado = liquidar(entrada);
   const avisos: string[] = [];
-  const sinNiveles = KPIS.filter(k => !cfg.niveles[k.id] && !['K9_DISPONIBILIDAD', 'K13_CUALITATIVA'].includes(k.id)).map(k => k.id);
+  const sinNiveles = KPIS.filter(k => !cfg.niveles[k.id] && k.id !== 'K9_DISPONIBILIDAD').map(k => k.id);
   if (sinNiveles.length) avisos.push(`Sin niveles configurados: ${sinNiveles.join(', ')}`);
-  if (!cfg.niveles.K9_ONLINE || !cfg.niveles.K9_UNFULFILLED) avisos.push('Sin niveles de Online Rate / Unfulfilled para el KPI 9');
+  if (!cfg.niveles.K9_DISPONIBILIDAD) avisos.push('KPI 9 sin objetivo de Online Rate configurado: se usa 100%');
   const pendientesCierre = datos.hallazgos.filter(h => h.cerradoEnVisitaSiguiente === null).length;
   if (pendientesCierre) avisos.push(`${pendientesCierre} hallazgo(s) sin revisar en visita siguiente`);
   const costePersonal = all(db, 'SELECT * FROM coste_personal_mes WHERE local_id=? AND periodo_id=? ORDER BY mes', localId, periodoId).map(c => ({
@@ -265,6 +309,16 @@ export const liquidacionCerrada = (db: DB, localId: string, periodoId: string) =
   return r ? { ...r, resultado: JSON.parse(r.resultado) } : null;
 };
 
+/** Borra los datos operativos de un local en un periodo (meses, Uber, checklists, visitas, fichas, compromisos, cualitativa, neutralizaciones, cierres). Conserva configuración, niveles y puertas. */
+export function vaciarDatos(db: DB, localId: string, periodoId: string) {
+  for (const t of ['meses', 'uber_mes', 'fichas_misterioso', 'compromisos', 'cualitativa', 'descuentos_mes', 'coste_personal_mes', 'neutralizaciones', 'liquidaciones'])
+    run(db, `DELETE FROM ${t} WHERE local_id = ? AND periodo_id = ?`, localId, periodoId);
+  run(db, 'DELETE FROM hallazgos WHERE visita_id IN (SELECT id FROM visitas WHERE local_id = ? AND periodo_id = ?)', localId, periodoId);
+  run(db, 'DELETE FROM visitas WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
+  run(db, 'DELETE FROM checklist_lineas WHERE semana_id IN (SELECT id FROM checklist_semanas WHERE local_id = ? AND periodo_id = ?)', localId, periodoId);
+  run(db, 'DELETE FROM checklist_semanas WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
+}
+
 export const acceso = (db: DB, token: string) => get(db, 'SELECT * FROM accesos WHERE token = ? AND activo = 1', token);
 
 /** Datos brutos de un local/periodo para la vista de entrada. */
@@ -273,7 +327,8 @@ export function datosBrutos(db: DB, localId: string, periodoId: string) {
     meses: all(db, 'SELECT * FROM meses WHERE local_id=? AND periodo_id=? ORDER BY mes', localId, periodoId),
     uber: all(db, 'SELECT * FROM uber_mes WHERE local_id=? AND periodo_id=? ORDER BY mes', localId, periodoId),
     checklists: all(db, 'SELECT * FROM checklist_semanas WHERE local_id=? AND periodo_id=? ORDER BY semana, hoja', localId, periodoId).map(s => ({ ...s, lineas: all(db, 'SELECT * FROM checklist_lineas WHERE semana_id=?', s.id) })),
-    visitas: all(db, 'SELECT * FROM visitas WHERE local_id=? AND periodo_id=? ORDER BY fecha', localId, periodoId).map(v => ({ ...v, hallazgos: all(db, 'SELECT * FROM hallazgos WHERE visita_id=?', v.id) })),
+    visitas: all(db, 'SELECT * FROM visitas WHERE local_id=? AND periodo_id=? ORDER BY fecha, id', localId, periodoId).map(v => ({ ...v, hallazgos: all(db, 'SELECT * FROM hallazgos WHERE visita_id=?', v.id) })),
+    hallazgosAbiertos: hallazgosAbiertos(db, localId, periodoId),
     fichas: all(db, 'SELECT * FROM fichas_misterioso WHERE local_id=? AND periodo_id=? ORDER BY fecha', localId, periodoId),
     compromisos: all(db, 'SELECT * FROM compromisos WHERE local_id=? AND periodo_id=? ORDER BY fecha_limite', localId, periodoId),
     cualitativa: get(db, 'SELECT * FROM cualitativa WHERE local_id=? AND periodo_id=?', localId, periodoId) ?? null,
