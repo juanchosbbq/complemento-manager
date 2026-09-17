@@ -22,13 +22,13 @@ Sin suelo garantizado. Sin media llave.
 | | | | 5 Rating Uber del periodo | 5 | mayor | Uber Eats | ponderado por pedidos |
 | | | | 6a Misterioso: sala | 4 | mayor | ficha | media de fichas |
 | | | | 6b Misterioso: producto | 1 | mayor | ficha | media de fichas con consumición |
-| Operaciones | 20 | sí | 7 Inaccurate Orders Rate | 13 | menor | Uber Eats | ponderado por pedidos |
-| | | | 8 Food Quality + Prep Delays | 5 | menor | Uber Eats | ponderado por pedidos |
+| Operaciones | 20 | sí | 7 Inaccurate Orders Rate | 15 | menor | Uber Eats | ponderado por pedidos |
+| | | | 8 Food Quality + Prep Delays | 3 | menor | Uber Eats | ponderado por pedidos |
 | | | | 9 Disponibilidad | 2 | — | Uber Eats | el peor logro entre Online Rate y Unfulfilled |
 | Mantenimiento | 10 | sí | 10 Fiabilidad del checklist | 6 | mayor | hojas A/B | líneas válidas / totales por hoja; computa la peor |
 | | | | 11 Hallazgos cerrados en visita siguiente | 4 | mayor | hoja de visita | cerrados / evaluables; sin hallazgos = 100 |
-| Dirección | 20 | no | 12a Iniciativas en plazo | 9 | mayor | registro | en plazo / total; sin exigidas = 100 |
-| | | | 12b Reportes en fecha | 6 | mayor | registro | ídem |
+| Dirección | 20 | no | 12a Iniciativas en plazo | 10 | mayor | registro | en plazo / total; sin exigidas = 100 |
+| | | | 12b Reportes en fecha | 5 | mayor | registro | ídem |
 | | | | 13 Valoración cualitativa | 5 | mayor | rúbrica | 4 criterios × 0–2; niveles 4 · 6 · 8 |
 
 Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala con su bloque. Los tres locales del piloto arrancan en MIXTO.
@@ -67,6 +67,13 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 | Descuentos | — | condición residual | > 0,3 % cualquier mes apaga llave de Ventas |
 | Redondeo | — | puntos redondeados por KPI (§13) | sin redondeo intermedio |
 | Piloto | Malasaña + 2 | Malasaña + 2 | Local 1, Local 2, Local 3 (por decidir); todos MIXTO / GESTOR |
+
+## Cambios posteriores al despliegue (17-sep-2026, al cargar las cartas reales de Local 1 y 2)
+
+- **Reasignación en Operaciones**: Precisión del pedido 13→15%, Incidencias de cocina 5→3%. Motivo: incidencias de cocina es el único KPI del modelo fuera del control real del Manager (no tiene mando sobre cocina), así que se reduce su peso a favor de lo que sí controla. Aplica a todos los locales.
+- **Compromisos con dirección 9/6 → 10/5** (12a Iniciativas / 12b Reportes). El total del bloque no cambia (15%).
+- **Escala de cuatro puntos por KPI**, no de tres. La llave (logro 90%) ahora es un valor calibrado a mano por KPI y por local — no tiene por qué caer a mitad de camino entre Umbral y Objetivo; en la práctica no suele hacerlo (p. ej. en Ticket Medio de Gabriel Lobo la llave coincide con la mediana del periodo, no con el punto medio aritmético). El motor interpola en tres tramos (umbral→llave→objetivo→excelencia) en vez de dos. Si un KPI no tiene llave configurada, se interpola linealmente entre umbral y objetivo como antes (compatibilidad hacia atrás, no debería usarse salvo excepción).
+- KPI 6 (Cliente misterioso) y KPI 12 (Compromisos) **se mantienen partidos** en sub-KPIs (6a/6b, 12a/12b) tal como se implementaron — confirmado explícitamente, no es un cambio.
 
 ## Inconsistencia detectada en v7
 

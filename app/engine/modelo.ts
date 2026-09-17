@@ -59,13 +59,13 @@ export const KPIS: KpiDef[] = [
   { id: 'K5_RATING_UBER', bloque: 'ATENCION', nombre: 'Rating de Uber Eats del periodo', tipo: 'P', peso: 5, sentido: 'mayor', unidad: 'nota 1–5', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K6A_MISTERIOSO_SALA', bloque: 'ATENCION', nombre: 'Cliente misterioso: sala y experiencia', tipo: 'P', peso: 4, sentido: 'mayor', unidad: 'puntos 0–100', fuente: 'Ficha propia', origen: 'manual' },
   { id: 'K6B_MISTERIOSO_PRODUCTO', bloque: 'ATENCION', nombre: 'Cliente misterioso: producto', tipo: 'P', peso: 1, sentido: 'mayor', unidad: 'puntos 0–100', fuente: 'Ficha propia', origen: 'manual' },
-  { id: 'K7_PRECISION', bloque: 'OPERACIONES', nombre: 'Precisión del pedido (Inaccurate Orders Rate)', tipo: 'D', peso: 13, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
-  { id: 'K8_COCINA', bloque: 'OPERACIONES', nombre: 'Incidencias imputables a cocina', tipo: 'C', peso: 5, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
+  { id: 'K7_PRECISION', bloque: 'OPERACIONES', nombre: 'Precisión del pedido (Inaccurate Orders Rate)', tipo: 'D', peso: 15, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
+  { id: 'K8_COCINA', bloque: 'OPERACIONES', nombre: 'Incidencias imputables a cocina', tipo: 'C', peso: 3, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K9_DISPONIBILIDAD', bloque: 'OPERACIONES', nombre: 'Disponibilidad del canal', tipo: 'D', peso: 2, sentido: 'mayor', unidad: 'logro del peor de Online / Unfulfilled', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K10_CHECKLIST', bloque: 'MANTENIMIENTO', nombre: 'Fiabilidad del checklist semanal', tipo: 'D', peso: 6, sentido: 'mayor', unidad: '% líneas válidas (peor hoja)', fuente: 'Hojas A y B', origen: 'manual' },
   { id: 'K11_HALLAZGOS', bloque: 'MANTENIMIENTO', nombre: 'Hallazgos cerrados en la visita siguiente', tipo: 'D', peso: 4, sentido: 'mayor', unidad: '% de hallazgos', fuente: 'Hoja de visita', origen: 'manual' },
-  { id: 'K12A_INICIATIVAS', bloque: 'DIRECCION', nombre: 'Iniciativas corporativas implantadas en plazo', tipo: 'OBJ', peso: 9, sentido: 'mayor', unidad: '% en plazo', fuente: 'Registro', origen: 'manual' },
-  { id: 'K12B_REPORTES', bloque: 'DIRECCION', nombre: 'Reportes entregados en fecha', tipo: 'OBJ', peso: 6, sentido: 'mayor', unidad: '% en fecha', fuente: 'Registro', origen: 'manual' },
+  { id: 'K12A_INICIATIVAS', bloque: 'DIRECCION', nombre: 'Iniciativas corporativas implantadas en plazo', tipo: 'OBJ', peso: 10, sentido: 'mayor', unidad: '% en plazo', fuente: 'Registro', origen: 'manual' },
+  { id: 'K12B_REPORTES', bloque: 'DIRECCION', nombre: 'Reportes entregados en fecha', tipo: 'OBJ', peso: 5, sentido: 'mayor', unidad: '% en fecha', fuente: 'Registro', origen: 'manual' },
   { id: 'K13_CUALITATIVA', bloque: 'DIRECCION', nombre: 'Valoración cualitativa de dirección', tipo: 'JUICIO', peso: 5, sentido: 'mayor', unidad: 'puntos 0–8', fuente: 'Rúbrica', origen: 'manual' },
 ];
 

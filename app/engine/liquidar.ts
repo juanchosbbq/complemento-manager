@@ -8,7 +8,11 @@ import {
   MOTIVO_NEUTRALIZACION_TEXTO, MotivoNeutralizacion, NOMBRE_BLOQUE, PESOS_BLOQUE, PerfilCanal, Sentido,
 } from './modelo';
 
-export interface Niveles { umbral: number; objetivo: number; excelencia: number }
+export interface Niveles {
+  umbral: number; objetivo: number; excelencia: number;
+  /** Punto calibrado a mano que corresponde a logro 90 (la llave del bloque). Si no se da, se interpola linealmente entre umbral y objetivo. */
+  llave?: number;
+}
 
 export interface ValorKpi {
   /** valor agregado del trimestre; null = sin dato */
@@ -86,6 +90,12 @@ export function logroKpi(valor: number, n: Niveles, sentido: Sentido): number {
   const frac = (v: number, a: number, b: number) => (b === a ? 1 : (v - a) / (b - a));
   if (mejor(valor, n.excelencia)) return ESCALA.excelencia;
   if (mejor(valor, n.objetivo)) return ESCALA.objetivo + (ESCALA.excelencia - ESCALA.objetivo) * frac(valor, n.objetivo, n.excelencia);
+  if (n.llave !== undefined) {
+    // Tres tramos: la llave (logro 90) es un punto calibrado a mano, no el punto medio entre umbral y objetivo.
+    if (mejor(valor, n.llave)) return CORTE_LLAVE + (ESCALA.objetivo - CORTE_LLAVE) * frac(valor, n.llave, n.objetivo);
+    if (mejor(valor, n.umbral)) return ESCALA.umbral + (CORTE_LLAVE - ESCALA.umbral) * frac(valor, n.umbral, n.llave);
+    return 0;
+  }
   if (mejor(valor, n.umbral)) return ESCALA.umbral + (ESCALA.objetivo - ESCALA.umbral) * frac(valor, n.umbral, n.objetivo);
   return 0;
 }

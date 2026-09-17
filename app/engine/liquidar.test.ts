@@ -48,6 +48,35 @@ describe('Escala de cada KPI (§2.3)', () => {
   it('rúbrica cualitativa: 7/8 → 110% (ejemplo §13 v7)', () => expect(logroKpi(7, { umbral: 4, objetivo: 6, excelencia: 8 }, 'mayor')).toBe(110));
 });
 
+describe('Llave calibrada a mano (no es el punto medio entre umbral y objetivo)', () => {
+  // Ticket medio de Gabriel Lobo: umbral 31,90 · llave 34,30 · objetivo 37,20 · excelencia 39,20
+  const n = { umbral: 31.90, llave: 34.30, objetivo: 37.20, excelencia: 39.20 };
+  it('en la llave da exactamente 90', () => expect(logroKpi(34.30, n, 'mayor')).toBe(90));
+  it('en el umbral da 50, en el objetivo 100, en la excelencia 120', () => {
+    expect(logroKpi(31.90, n, 'mayor')).toBe(50);
+    expect(logroKpi(37.20, n, 'mayor')).toBe(100);
+    expect(logroKpi(39.20, n, 'mayor')).toBe(120);
+  });
+  it('interpola distinto a un lado y otro de la llave (los tramos no son simétricos)', () => {
+    // tramo umbral→llave es más corto (2,40€) que llave→objetivo (2,90€): la misma distancia en € vale más logro en el primer tramo
+    const puntoMedioTramo1 = logroKpi(31.90 + 1.20, n, 'mayor'); // mitad de umbral→llave
+    const puntoMedioTramo2 = logroKpi(34.30 + 1.45, n, 'mayor'); // mitad de llave→objetivo
+    expect(puntoMedioTramo1).toBeCloseTo(70, 9); // 50 + (90-50)/2
+    expect(puntoMedioTramo2).toBeCloseTo(95, 9); // 90 + (100-90)/2
+  });
+  it('sin llave calibrada, se interpola linealmente entre umbral y objetivo como antes (compatibilidad)', () => {
+    const sinLlave = { umbral: 90, objetivo: 100, excelencia: 110 };
+    expect(logroKpi(95, sinLlave, 'mayor')).toBe(75); // igual que el primer test del bloque de escala
+  });
+  it('funciona igual con sentido menor-mejor', () => {
+    // Precisión del pedido de Gabriel Lobo: umbral 2,4% · llave 1,9% · objetivo 1,0% · excelencia 0,6%
+    const m = { umbral: 2.4, llave: 1.9, objetivo: 1.0, excelencia: 0.6 };
+    expect(logroKpi(1.9, m, 'menor')).toBe(90);
+    expect(logroKpi(2.4, m, 'menor')).toBe(50);
+    expect(logroKpi(3, m, 'menor')).toBe(0);
+  });
+});
+
 describe('Pesos del modelo', () => {
   it('los pesos de los 16 sub-KPIs suman 100 en MIXTO y cada bloque suma su peso', () => {
     expect(KPIS.reduce((s, k) => s + k.peso, 0)).toBe(100);
@@ -55,16 +84,20 @@ describe('Pesos del modelo', () => {
       expect(KPIS.filter(k => k.bloque === b).reduce((s, k) => s + k.peso, 0)).toBe(PESOS_BLOQUE.MIXTO[b]);
     }
   });
-  it('sin guardia en días libres: Dirección es 9 + 6 + 5', () => {
-    expect(KPIS.find(k => k.id === 'K12A_INICIATIVAS')!.peso).toBe(9);
-    expect(KPIS.find(k => k.id === 'K12B_REPORTES')!.peso).toBe(6);
+  it('sin guardia en días libres: Dirección es 10 + 5 + 5', () => {
+    expect(KPIS.find(k => k.id === 'K12A_INICIATIVAS')!.peso).toBe(10);
+    expect(KPIS.find(k => k.id === 'K12B_REPORTES')!.peso).toBe(5);
     expect(KPIS.some(k => k.id.includes('GUARDIA'))).toBe(false);
+  });
+  it('Operaciones reasignado: Precisión 15% / Incidencias de cocina 3% (el Manager no controla la cocina)', () => {
+    expect(KPIS.find(k => k.id === 'K7_PRECISION')!.peso).toBe(15);
+    expect(KPIS.find(k => k.id === 'K8_COCINA')!.peso).toBe(3);
   });
   it('perfil DELIVERY: Atención 15 / Operaciones 25 y los KPIs escalan proporcionalmente', () => {
     const r = liquidar(base({ perfilCanal: 'DELIVERY' }));
     expect(bloque(r, 'ATENCION').peso).toBe(15);
     expect(bloque(r, 'OPERACIONES').peso).toBe(25);
-    expect(kpi(r, 'K7_PRECISION').pesoEfectivo).toBe(16.25);
+    expect(kpi(r, 'K7_PRECISION').pesoEfectivo).toBe(18.75);
     expect(kpi(r, 'K4A_RESENAS_VOLUMEN').pesoEfectivo).toBe(4.5);
     expect(r.kpis.reduce((s, k) => s + k.pesoEfectivo, 0)).toBeCloseTo(100, 5);
   });
@@ -83,24 +116,25 @@ describe('Ejemplo de liquidación §13 v7 (Malasaña, Q4) — bloques troncales'
     const r = liquidar(conLogros(logros));
     expect(bloque(r, 'VENTAS').logro).toBe(102.4);
     expect(bloque(r, 'ATENCION').logro).toBe(98.6);
-    expect(bloque(r, 'OPERACIONES').logro).toBe(96.9);
+    expect(bloque(r, 'OPERACIONES').logro).toBe(100.3);
     expect(bloque(r, 'MANTENIMIENTO').logro).toBe(79);
     expect(r.llavesCumplidas).toBe(3);
     expect(r.coefLlaves).toBe(0.7);
   });
-  it('Dirección cambia respecto al documento porque sale la guardia (12c): 100,1 en lugar de 102,0', () => {
+  it('Operaciones y Dirección cambian respecto al documento por la guardia (12c) y el reparto 15/3/2, 10/5/5: 100,3 y 100,5 en lugar de 96,9 y 102,0', () => {
     const r = liquidar(conLogros(logros));
-    expect(bloque(r, 'DIRECCION').logro).toBe(100.1);
-    expect(r.logroPonderado).toBe(97.8);
-    expect(r.pago).toBe(1026.38); // 1.500 × 97,75% × 0,70
+    expect(bloque(r, 'OPERACIONES').logro).toBe(100.3);
+    expect(bloque(r, 'DIRECCION').logro).toBe(100.5);
+    expect(r.logroPonderado).toBe(98.5);
+    expect(r.pago).toBe(1034.36); // 1.500 × 98,5% × 0,70 aprox (con decimales exactos del motor)
   });
   it('§13.1: checklist de cocina al 95% → KPI 10 al 100%, 4 de 4 llaves, ×1,00', () => {
     const r = liquidar(conLogros({ ...logros, K10_CHECKLIST: 100 }));
     expect(bloque(r, 'MANTENIMIENTO').logro).toBe(100);
     expect(r.llavesCumplidas).toBe(4);
     expect(r.coefLlaves).toBe(1);
-    expect(r.logroPonderado).toBe(99.9);
-    expect(r.pago).toBe(1497.75);
+    expect(r.logroPonderado).toBe(100.6);
+    expect(r.pago).toBe(1509.15);
   });
 });
 

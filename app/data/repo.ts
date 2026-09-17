@@ -34,7 +34,7 @@ export function config(db: DB, localId: string, periodoId: string): ConfigPeriod
   if (!c) return null;
   const niveles: ConfigPeriodo['niveles'] = {};
   for (const n of all(db, 'SELECT * FROM niveles WHERE local_id = ? AND periodo_id = ?', localId, periodoId))
-    (niveles as any)[n.kpi] = { umbral: n.umbral, objetivo: n.objetivo, excelencia: n.excelencia };
+    (niveles as any)[n.kpi] = { umbral: n.umbral, objetivo: n.objetivo, excelencia: n.excelencia, llave: n.llave ?? undefined };
   const p = get(db, 'SELECT * FROM puertas WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
   return {
     importeObjetivo: c.importe_objetivo, perfilCanal: c.perfil_canal as PerfilCanal, niveles,
@@ -52,7 +52,7 @@ export function config(db: DB, localId: string, periodoId: string): ConfigPeriod
 export function configCruda(db: DB, localId: string, periodoId: string) {
   return {
     config: get(db, 'SELECT * FROM config_periodo WHERE local_id = ? AND periodo_id = ?', localId, periodoId) ?? null,
-    niveles: all(db, 'SELECT kpi, umbral, objetivo, excelencia FROM niveles WHERE local_id = ? AND periodo_id = ?', localId, periodoId),
+    niveles: all(db, 'SELECT kpi, umbral, objetivo, excelencia, llave FROM niveles WHERE local_id = ? AND periodo_id = ?', localId, periodoId),
     puertas: get(db, 'SELECT * FROM puertas WHERE local_id = ? AND periodo_id = ?', localId, periodoId) ?? null,
   };
 }
@@ -68,10 +68,10 @@ export function guardarConfig(db: DB, localId: string, periodoId: string, c: Row
     c.prorrateo ?? 1, c.baja_voluntaria ? 1 : 0, c.productos_estrategicos ?? null, c.fecha_comunicacion ?? null, c.fecha_extraccion_prevista ?? null, autor, ahora());
 }
 
-export function guardarNiveles(db: DB, localId: string, periodoId: string, niveles: { kpi: string; umbral: number; objetivo: number; excelencia: number }[], autor: string) {
-  const st = db.prepare(`INSERT INTO niveles (local_id, periodo_id, kpi, umbral, objetivo, excelencia, autor, ts) VALUES (?,?,?,?,?,?,?,?)
-    ON CONFLICT(local_id, periodo_id, kpi) DO UPDATE SET umbral=excluded.umbral, objetivo=excluded.objetivo, excelencia=excluded.excelencia, autor=excluded.autor, ts=excluded.ts`);
-  for (const n of niveles) st.run(localId, periodoId, n.kpi, n.umbral, n.objetivo, n.excelencia, autor, ahora());
+export function guardarNiveles(db: DB, localId: string, periodoId: string, niveles: { kpi: string; umbral: number; objetivo: number; excelencia: number; llave?: number }[], autor: string) {
+  const st = db.prepare(`INSERT INTO niveles (local_id, periodo_id, kpi, umbral, objetivo, excelencia, llave, autor, ts) VALUES (?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(local_id, periodo_id, kpi) DO UPDATE SET umbral=excluded.umbral, objetivo=excluded.objetivo, excelencia=excluded.excelencia, llave=excluded.llave, autor=excluded.autor, ts=excluded.ts`);
+  for (const n of niveles) st.run(localId, periodoId, n.kpi, n.umbral, n.objetivo, n.excelencia, n.llave ?? null, autor, ahora());
 }
 
 export function guardarPuertas(db: DB, localId: string, periodoId: string, p: Row, autor: string) {

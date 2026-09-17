@@ -37,7 +37,9 @@ CREATE TABLE IF NOT EXISTS config_periodo (
 );
 CREATE TABLE IF NOT EXISTS niveles (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL, kpi TEXT NOT NULL,
-  umbral REAL NOT NULL, objetivo REAL NOT NULL, excelencia REAL NOT NULL, autor TEXT, ts TEXT NOT NULL,
+  umbral REAL NOT NULL, objetivo REAL NOT NULL, excelencia REAL NOT NULL,
+  llave REAL, -- punto calibrado a mano que corresponde a logro 90%; NULL = se interpola entre umbral y objetivo
+  autor TEXT, ts TEXT NOT NULL,
   PRIMARY KEY (local_id, periodo_id, kpi)
 );
 -- Bloque 1 y parte del 2: dato mensual (Revo y Joombo). Un registro por mes.
@@ -141,6 +143,8 @@ export function abrir(ruta = process.env.INCENTIVOS_DB ?? new URL('./incentivos.
   const db = new DatabaseSync(ruta);
   db.exec('PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL;');
   db.exec(ESQUEMA);
+  // Migración: bases creadas antes de añadir la escala de cuatro puntos no tienen esta columna.
+  try { db.exec('ALTER TABLE niveles ADD COLUMN llave REAL'); } catch { /* ya existía */ }
   return db;
 }
 

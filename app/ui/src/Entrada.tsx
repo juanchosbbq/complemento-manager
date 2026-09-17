@@ -251,8 +251,8 @@ function Config({ localId, periodoId, datos, modelo, onCambio }: Props) {
   const cfg = datos.configuracion.config ?? {};
   const [c, setC] = useState<any>({ importe_objetivo: cfg.importe_objetivo ?? 1500, perfil_canal: cfg.perfil_canal ?? 'MIXTO', suelo_nota_resenas: cfg.suelo_nota_resenas ?? 4.2, umbral_descuentos_pct: cfg.umbral_descuentos_pct ?? 0.3, prorrateo: cfg.prorrateo ?? 1, baja_voluntaria: !!cfg.baja_voluntaria, productos_estrategicos: cfg.productos_estrategicos ?? '', fecha_comunicacion: cfg.fecha_comunicacion ?? '', fecha_extraccion_prevista: cfg.fecha_extraccion_prevista ?? '' });
   const ids: [string, string][] = [...(modelo?.kpis ?? []).filter((k: any) => k.id !== 'K9_DISPONIBILIDAD' && k.id !== 'K13_CUALITATIVA').map((k: any) => [k.id, k.nombre + ' (' + k.unidad + ')']), ['K9_ONLINE', 'Online Rate (%) — mayor mejor'], ['K9_UNFULFILLED', 'Unfulfilled Order Rate (%) — menor mejor']];
-  const [niv, setNiv] = useState<Record<string, any>>(Object.fromEntries(ids.map(([id]) => { const e = datos.configuracion.niveles.find((x: any) => x.kpi === id); return [id, { umbral: e?.umbral ?? '', objetivo: e?.objetivo ?? '', excelencia: e?.excelencia ?? '' }]; })));
-  const guardar = () => enviar(`config/${localId}/${periodoId}`, { config: c, niveles: ids.filter(([id]) => niv[id].umbral !== '' && niv[id].objetivo !== '' && niv[id].excelencia !== '').map(([id]) => ({ kpi: id, umbral: Number(niv[id].umbral), objetivo: Number(niv[id].objetivo), excelencia: Number(niv[id].excelencia) })) }, 'Configuración guardada.');
+  const [niv, setNiv] = useState<Record<string, any>>(Object.fromEntries(ids.map(([id]) => { const e = datos.configuracion.niveles.find((x: any) => x.kpi === id); return [id, { umbral: e?.umbral ?? '', llave: e?.llave ?? '', objetivo: e?.objetivo ?? '', excelencia: e?.excelencia ?? '' }]; })));
+  const guardar = () => enviar(`config/${localId}/${periodoId}`, { config: c, niveles: ids.filter(([id]) => niv[id].umbral !== '' && niv[id].objetivo !== '' && niv[id].excelencia !== '').map(([id]) => ({ kpi: id, umbral: Number(niv[id].umbral), llave: niv[id].llave === '' ? undefined : Number(niv[id].llave), objetivo: Number(niv[id].objetivo), excelencia: Number(niv[id].excelencia) })) }, 'Configuración guardada.');
   return (
     <section className="panel">
       <h2>Configuración del periodo — carta de objetivos</h2>
@@ -269,8 +269,9 @@ function Config({ localId, periodoId, datos, modelo, onCambio }: Props) {
         <label>Fecha prevista de extracción<input type="date" value={c.fecha_extraccion_prevista ?? ''} onChange={e => setC({ ...c, fecha_extraccion_prevista: e.target.value })} /></label>
       </div>
       <h3 style={{ marginTop: 16 }}>Umbrales por KPI</h3>
-      <table><thead><tr><th>KPI</th><th className="n">Umbral</th><th className="n">Objetivo</th><th className="n">Excelencia</th></tr></thead><tbody>
-        {ids.map(([id, t]) => <tr key={id}><td>{t}</td>{(['umbral', 'objetivo', 'excelencia'] as const).map(k => <td className="n" key={k}><input type="number" step="any" style={{ width: 90 }} value={niv[id][k]} onChange={e => setNiv({ ...niv, [id]: { ...niv[id], [k]: e.target.value } })} /></td>)}</tr>)}
+      <p className="small muted">Llave (90%) se calibra a mano por KPI — no tiene por qué ser el punto medio entre Umbral y Objetivo. Déjala en blanco para que se interpole automáticamente entre los dos.</p>
+      <table><thead><tr><th>KPI</th><th className="n">Umbral (50%)</th><th className="n">Llave (90%)</th><th className="n">Objetivo (100%)</th><th className="n">Excelencia (120%)</th></tr></thead><tbody>
+        {ids.map(([id, t]) => <tr key={id}><td>{t}</td>{(['umbral', 'llave', 'objetivo', 'excelencia'] as const).map(k => <td className="n" key={k}><input type="number" step="any" style={{ width: 90 }} value={niv[id][k]} onChange={e => setNiv({ ...niv, [id]: { ...niv[id], [k]: e.target.value } })} /></td>)}</tr>)}
       </tbody></table>
       <div style={{ marginTop: 12 }}><button className="btn" onClick={guardar}>Guardar configuración</button></div>
       <Msg />

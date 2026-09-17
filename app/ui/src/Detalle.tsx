@@ -64,7 +64,7 @@ export function Detalle({ calc, modelo, rol }: { calc: any; modelo: any; rol: st
                     </td>
                     <td className="n">{num(k.pesoEfectivo, 2)}{k.pesoEfectivo !== k.pesoBase && <span className="small muted"> ({k.pesoBase})</span>}</td>
                     <td className="n">{pendiente ? <span className="muted">pendiente</span> : num(k.valor, 2)}</td>
-                    <td className="small">{noComputa ? '—' : <>{num(k.niveles.umbral, 2)} · {num(k.niveles.objetivo, 2)} · {num(k.niveles.excelencia, 2)}<Barra logro={k.logro} /></>}</td>
+                    <td className="small">{noComputa ? '—' : <>{num(k.niveles.umbral, 2)} · {k.niveles.llave !== undefined && k.niveles.llave !== null ? `${num(k.niveles.llave, 2)} · ` : ''}{num(k.niveles.objetivo, 2)} · {num(k.niveles.excelencia, 2)}<Barra logro={k.logro} /></>}</td>
                     <td className="n">{noComputa ? '—' : `${num(k.logro)} %`}</td>
                     <td className="n">{num(k.puntos, 2)}</td>
                   </tr>
