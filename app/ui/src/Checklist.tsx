@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { post } from './api';
+import { api, post } from './api';
 
 function semanaActual(): string {
   const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
@@ -62,8 +62,15 @@ export function Checklist({ localId, periodoId, catalogo, existentes, nombre, on
         );
       })}
       {noConformesSinAviso > 0 && <div className="aviso" style={{ marginTop: 12 }}>{noConformesSinAviso} línea(s) no conforme(s) sin aviso registrado: no serán válidas. Da el aviso y márcalo.</div>}
-      <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center' }}>
+      <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <button className="btn" onClick={guardar} disabled={lineasHoja.length === 0}>Guardar checklist</button>
+        {existentes.some(s => s.semana === semana && s.hoja === hoja) && (
+          <button className="btn sec" onClick={async () => {
+            if (!confirm(`¿Borrar el checklist ${hoja} de la semana ${semana}?`)) return;
+            try { await api(`checklist/${localId}/${periodoId}`, { method: 'DELETE', body: { semana, hoja } }); setMsg({ tipo: 'ok', texto: 'Checklist borrado.' }); onGuardado(); }
+            catch (e: any) { setMsg({ tipo: 'error', texto: e.message }); }
+          }}>Borrar esta semana</button>
+        )}
         {msg && <span className={msg.tipo === 'ok' ? 'estado verde' : 'estado rojo'}>{msg.texto}</span>}
       </div>
     </section>

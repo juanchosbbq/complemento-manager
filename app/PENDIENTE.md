@@ -2,17 +2,19 @@
 
 ## Antes del 1 de octubre (bloqueante para el piloto)
 
-1. **Umbrales reales por local.** Los niveles sembrados son ilustrativos. Cargar los de la carta de objetivos de cada local (Configuración) y los objetivos mensuales de facturación, ticket, tickets previstos y reseñas (Ventas y reseñas). Fecha de comunicación ≤ 16 de septiembre.
-2. **Local 3.** Decidir (Las Tablas, Pozuelo o Majadahonda) y, si hace falta, confirmar su perfil de canal.
-3. **Mapeo del CSV de Uber.** `MAPEO_COLUMNAS` en `server/integraciones/ubereats.ts` es un supuesto por alias. Verificar con un export real de Uber Eats Manager (Performance → Operations, corte por periodo) y ajustar. Confirmar también que el «Rating del periodo» sale en ese export y no solo en Customer feedback.
-4. **Catálogo definitivo de las hojas A y B.** Las 8+8 líneas sembradas son los elementos tipo del §7.1. Sustituir por las hojas definitivas (tabla `lineas_catalogo`); la hoja de visita usa el mismo catálogo.
+1. **Umbrales por local.** Local 1 cargado (17-sep). Local 2: cargar desde su hoja. Local 3 (Las Tablas): pendiente de carta. Después, en cada local, el reparto mensual de facturación y reseñas (Ventas y reseñas) para que el seguimiento a fecha tenga sentido.
+2. ~~Vaciar los datos de ejemplo de Local 1 en producción~~ ya no aplica si producción nunca se sembró con --ejemplo. **Vaciar los datos de ejemplo de Local 1 en producción** (Configuración → Vaciar datos operativos) antes de que el Manager empiece a usarlo. Los niveles de Local 2 y 3 que dejó el sembrado inicial están en unidades antiguas (%): sustituirlos al cargar cada carta.
+2b. **Suelo de nota de reseñas**: cargado como el Umbral de 4b (4,0 / 4,4). Es una suposición; confirmar.
+3. **Uber Eats.** La carga es manual (se teclean los valores del corte mensual). El importador de CSV sigue en `server/integraciones/ubereats.ts` por si se retoma; su mapeo de columnas está sin verificar contra un export real. El rating sale de Feedback → Overview, no de Operations.
+4. **Normalizar la hoja A de sala.** La lista actual ya incluye lo pedido el 18-sep (música, WiFi, LEDs murales, iluminación separada, bloque de barra), pero está pendiente de normalizar del todo con operaciones. Catálogo definitivo de las hojas A y B.
+4b. **Antiguo pendiente del catálogo:** Las 8+8 líneas sembradas son los elementos tipo del §7.1. Sustituir por las hojas definitivas (tabla `lineas_catalogo`); la hoja de visita usa el mismo catálogo.
 5. **Productos estratégicos** por local (máx. 3 SKUs) y cómo se extrae la penetración de Revo.
 6. **Códigos de acceso.** Cambiar los sembrados (`accesos`) y decidir dónde se despliega (portátil de dirección, VPS). Sin HTTPS no debe salir de la red interna.
 
 ## Antes del cierre de Q4 (T+15, mediados de enero)
 
 7. **Sistema de tickets** para incidencias de sala y escalados a cocina (SLA 30 min / 24 h). Hoy la neutralización por escalado se registra a mano con evidencia; el registro debería nacer del ticket.
-8. **Rúbrica cualitativa**: fijar el texto de los cuatro criterios y sus ejemplos de 0 y 2 (los de la UI son los del §8.3).
+8. **Valoración cualitativa**: ahora es nota 1–10 con justificación. Decidir si la rúbrica de cuatro criterios se mantiene como guía escrita para la justificación (hoy solo se cita en la ayuda del formulario).
 9. **Coste de personal de sala**: decidir si entra en el modelo. Se está midiendo con la misma calidad que un KPI.
 10. **Cierre y reclamación**: la foto de liquidación se puede sobrescribir. Si se quiere historial de cierres, convertir `liquidaciones` en tabla con versión.
 

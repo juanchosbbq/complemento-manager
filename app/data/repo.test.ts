@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { abrir } from './db';
-import { calcular, datosPeriodo, guardarChecklist, guardarConfig, guardarNiveles, guardarVisita, semanaISO } from './repo';
+import { calcular, calcularProrrateo, config, datosPeriodo, guardarChecklist, guardarConfig, guardarNiveles, guardarVisita, hallazgosAbiertos, semanaISO } from './repo';
 import { importarCsvUber } from '../server/integraciones/ubereats';
 
 function dbPrueba() {
@@ -73,5 +73,44 @@ describe('Importación CSV de Uber Eats', () => {
   it('avisa de columnas ausentes', () => {
     const r = importarCsvUber('Date,Orders\n2026-10-01,5\n');
     expect(r.columnasNoEncontradas).toContain('inaccurate_rate');
+  });
+});
+
+describe('Situaciones especiales (carta §9): prorrateo por días efectivos', () => {
+  const p = { inicio: '2026-10-01', fin: '2026-12-31' }; // 92 días
+  it('sin incidencias → 1', () => expect(calcularProrrateo(p, {}).prorrateo).toBe(1));
+  it('IT de 15 días o menos no prorratea; de más de 15, sí, por los días completos', () => {
+    expect(calcularProrrateo(p, { dias_it: 15 }).prorrateo).toBe(1);
+    expect(calcularProrrateo(p, { dias_it: 23 }).prorrateo).toBe(0.75); // 69/92
+  });
+  it('alta a mitad de trimestre: solo cuentan los días desde el alta', () => {
+    expect(calcularProrrateo(p, { fecha_alta: '2026-11-01' }).diasEfectivos).toBe(61);
+    expect(calcularProrrateo(p, { fecha_alta: '2026-11-01' }).prorrateo).toBe(0.663);
+  });
+  it('guardarConfig recalcula el prorrateo y conserva lo que no se envía', () => {
+    const db = dbPrueba();
+    guardarConfig(db, 'L1', 'Q4-2026', { importe_objetivo: 1500, dias_it: 30 }, 'test');
+    expect(config(db, 'L1', 'Q4-2026')!.prorrateo).toBe(0.674); // 62/92
+    guardarConfig(db, 'L1', 'Q4-2026', { productos_estrategicos: 'Entrantes' }, 'test');
+    const c = config(db, 'L1', 'Q4-2026')!;
+    expect(c.prorrateo).toBe(0.674);
+    expect(c.importeObjetivo).toBe(1500);
+  });
+});
+
+describe('Cierre de hallazgos en visitas posteriores', () => {
+  it('cerrar en la visita inmediata puntúa; cerrar más tarde se registra pero no puntúa', () => {
+    const db = dbPrueba();
+    const v1 = guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-05', visitante: 'A', hallazgos: [{ hoja: 'A', linea_id: 'a1', reportado_previamente: 1 }, { hoja: 'A', linea_id: 'a2', reportado_previamente: 1 }] });
+    const [h1, h2] = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ? ORDER BY id').all(v1) as any[]).map(r => r.id);
+    // visita 2: h1 cerrado, h2 sigue abierto
+    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-12', visitante: 'B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }, { hallazgo_id: h2, cerrado: false }] });
+    // visita 3: h2 se cierra por fin
+    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-19', visitante: 'C', hallazgos: [], cierres: [{ hallazgo_id: h2, cerrado: true }] });
+    const rows = db.prepare('SELECT id, cerrado_en_siguiente, cerrado_fecha FROM hallazgos ORDER BY id').all() as any[];
+    expect(rows[0]).toMatchObject({ cerrado_en_siguiente: 1, cerrado_fecha: '2026-10-12' });
+    expect(rows[1]).toMatchObject({ cerrado_en_siguiente: 0, cerrado_fecha: '2026-10-19' });
+    expect(hallazgosAbiertos(db, 'L1', 'Q4-2026').length).toBe(0);
+    expect(calcular(db, 'L1', 'Q4-2026').agregados.valores.K11_HALLAZGOS.valor).toBe(50);
   });
 });
