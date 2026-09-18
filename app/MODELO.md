@@ -94,16 +94,6 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Checklists**: hoja A ampliada (música, WiFi, LEDs murales, iluminación de sala y exterior por separado, y bloque de barra: cámaras, hielo, fregadero, grifo de cerveza, lavavajillas); hoja B con parrilla sola, tostadora y las cámaras separadas en positivo, congelación y mesas frías.
 - **La reclamación sigue siendo por correo**, en los diez días de la carta: no se hace desde la app.
 
-## v5.2 (18-sep-2026, tarde)
-
-- **Iconos de bloque en la portada de Dirección**: euro (ventas), estrella (atención), bolsa de pedido (operaciones) y llave inglesa (mantenimiento) en el color del semáforo; un quinto icono azul para Dirección con la nota dentro, sin semáforo porque no es llave.
-- **Corregido: scroll horizontal en móvil.** Las tablas anchas (desglose de KPIs, resumen de Dirección, umbrales de Configuración) desplazaban la página entera de lado a lado, cortando el contenido. Ahora cada tabla se desplaza dentro de su propio panel (`overflow-x: auto`), y `html`/`body` llevan `overflow-x: hidden` como red de seguridad para que ningún otro elemento pueda volver a romper el ancho de la página.
-
-## v5.3 (18-sep-2026, tarde)
-
-- **El catálogo de checklist se sincroniza solo en cada despliegue.** `npm run seed` (lo que corre el contenedor en cada arranque) actualiza siempre las líneas de las hojas A y B a lo que diga `data/seed.ts`, sin necesidad de `--forzar` y sin tocar configuración, umbrales ni ningún otro dato ya cargado de ningún local. Para cambiar el catálogo en el futuro: editar el array en `data/seed.ts` y hacer commit + push, nada más.
-- **IDs de línea fijos** (`A_clima`, `A_ilum_sala`, `B_parrilla`…) en vez de posicionales (`A1`, `A2`…). Antes, insertar una línea nueva en medio de la lista desplazaba el significado de todas las siguientes — con checklists reales ya guardados, eso habría cambiado en silencio a qué elemento apuntaba un `NO_CONFORME` de una semana pasada. Con id fijo, añadir o quitar una línea nunca afecta al histórico.
-
 ## Inconsistencia detectada en v7
 
 §2.4 dice que solo los KPIs C se neutralizan, pero §6 (parada justificada, KPI 9), §12 (cambio de métrica) y §16 (no comunicado a T−15) neutralizan otros. Hay que reescribir §2.4 como «neutralización por causa tasada» con las cuatro causas.

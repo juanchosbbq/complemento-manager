@@ -3,7 +3,7 @@
 ## Antes del 1 de octubre (bloqueante para el piloto)
 
 1. **Umbrales por local.** Local 1 cargado (17-sep). Local 2: cargar desde su hoja. Local 3 (Las Tablas): pendiente de carta. Después, en cada local, el reparto mensual de facturación y reseñas (Ventas y reseñas) para que el seguimiento a fecha tenga sentido.
-2. ~~Vaciar los datos de ejemplo de Local 1 en producción~~ ya no aplica si producción nunca se sembró con --ejemplo. **Vaciar los datos de ejemplo de Local 1 en producción** (Configuración → Vaciar datos operativos) antes de que el Manager empiece a usarlo. Los niveles de Local 2 y 3 que dejó el sembrado inicial están en unidades antiguas (%): sustituirlos al cargar cada carta.
+2. **Vaciar los datos de ejemplo de Local 1 en producción** (Configuración → Vaciar datos operativos) antes de que el Manager empiece a usarlo. Los niveles de Local 2 y 3 que dejó el sembrado inicial están en unidades antiguas (%): sustituirlos al cargar cada carta.
 2b. **Suelo de nota de reseñas**: cargado como el Umbral de 4b (4,0 / 4,4). Es una suposición; confirmar.
 3. **Uber Eats.** La carga es manual (se teclean los valores del corte mensual). El importador de CSV sigue en `server/integraciones/ubereats.ts` por si se retoma; su mapeo de columnas está sin verificar contra un export real. El rating sale de Feedback → Overview, no de Operations.
 4. **Normalizar la hoja A de sala.** La lista actual ya incluye lo pedido el 18-sep (música, WiFi, LEDs murales, iluminación separada, bloque de barra), pero está pendiente de normalizar del todo con operaciones. Catálogo definitivo de las hojas A y B.
