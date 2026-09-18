@@ -14,8 +14,8 @@ Sin suelo garantizado. Sin media llave.
 
 | Bloque | Peso | Llave | KPI | Peso | Sentido | Fuente | Agregación del trimestre |
 |---|---|---|---|---|---|---|---|
-| Ventas | 30 | sí | 1 Facturación neta | 15 | mayor | Revo | Σ € de los meses con dato, contra niveles en € del trimestre (prorrateados a fecha) |
-| | | | 2 Ticket medio | 8 | mayor | Revo | Σ facturación / Σ tickets, en €; sin prorrateo |
+| Ventas | 30 | sí | 1 Facturación neta | 15 | mayor | Revo | Σ € de los meses con dato, contra el nivel en € del **trimestre** (prorrateado a fecha) |
+| | | | 2 Ticket medio | 8 | mayor | Revo | ticket medio de cada mes (de Revo), ponderado por facturación; sin prorrateo |
 | | | | 3 Penetración productos estratégicos | 7 | mayor | Revo | media ponderada por tickets |
 | Atención | 20 | sí | 4a Reseñas: volumen | 6 | mayor | Joombo | Σ reseñas, contra niveles en nº del trimestre (prorrateados a fecha) |
 | | | | 4b Reseñas: nota | 4 | mayor | Joombo | media de todas las reseñas del periodo |
@@ -23,7 +23,7 @@ Sin suelo garantizado. Sin media llave.
 | | | | 6a Misterioso: sala | 4 | mayor | ficha | media de fichas, nota 1–10 |
 | | | | 6b Misterioso: producto | 1 | mayor | ficha | media de fichas con consumición, nota 1–10 |
 | Operaciones | 20 | sí | 7 Inaccurate Orders Rate | 15 | menor | Uber Eats | ponderado por pedidos |
-| | | | 8 Food Quality + Prep Delays | 3 | menor | Uber Eats | ponderado por pedidos |
+| | | | 8 Food Taste or Quality Issues | 3 | menor | Uber Eats | ponderado por pedidos; los retrasos de preparación salen del modelo |
 | | | | 9 Disponibilidad | 2 | — | Uber Eats | binario: Online Rate ≥ objetivo (100%) → 100, si no 0; neutralizable por parada justificada |
 | Mantenimiento | 10 | sí | 10 Fiabilidad del checklist | 6 | mayor | hojas A/B | líneas válidas / totales por hoja; computa la peor |
 | | | | 11 Hallazgos cerrados en visita siguiente | 4 | mayor | hoja de visita | cerrados / evaluables; sin hallazgos = 100 |
@@ -53,7 +53,8 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 | Línea de checklist válida | CONFORME, o NO CONFORME con aviso en 24 h. Inválida: NO CONFORME sin aviso; o hallazgo de dirección no reportado que debió detectarse (invalida la última línea anterior a la visita). |
 | Hallazgo de la última visita del trimestre | No tiene visita siguiente: no cuenta; pasa al siguiente trimestre. |
 | Sin dato y sin neutralización | Computa 0. |
-| Acumulado a fecha | Solo meses ≤ corte. Los niveles absolutos (facturación, reseñas) se prorratean con el reparto mensual del objetivo (o por meses si no hay reparto). Sin proyecciones. |
+| Acumulado a fecha | Solo meses ≤ corte. El objetivo es trimestral: para leerlo a fecha se prorratea con la previsión mensual (meta volante, opcional) o a partes iguales. Sin proyecciones. |
+| Indicadores sin dato | En el seguimiento a fecha quedan **pendientes**: salen del numerador y del denominador del bloque, no cuentan 0. Al cierre sí computan 0, y el cierre avisa y pide confirmación si falta alguno. |
 | Prorrateo (carta §9) | Alta o baja dentro del periodo → días efectivos / días del periodo. IT > 15 días → se restan esos días. Baja voluntaria → 0. Cubrir otro local no cambia nada. |
 | Hallazgos | Se pueden cerrar en cualquier visita posterior (seguimiento), pero solo puntúa el veredicto de la visita inmediatamente siguiente. |
 
@@ -80,6 +81,18 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **KPI 9 solo Online Rate**, binario. Unfulfilled Order Rate sale del modelo.
 - **Cliente misterioso y valoración cualitativa en nota 1–10** con un decimal (antes 0–100 y rúbrica 0–8). La rúbrica de cuatro criterios queda como guía de la justificación escrita, no como fórmula.
 - **Descuentos y coste de personal de sala** se siguen guardando si se cargan por API, pero desaparecen de la interfaz durante el piloto.
+
+## Cambios del 18-sep-2026
+
+- **El objetivo es trimestral y solo trimestral.** No existen objetivos mensuales. Lo que se carga por mes es el dato real; la previsión mensual es opcional ("meta volante") y solo sirve para repartir el objetivo del trimestre en el seguimiento a fecha — importa en Q4, donde diciembre pesa más que octubre. Sin previsión, el reparto es a partes iguales y la app lo avisa.
+- **Ticket medio**: se carga el del mes (de Revo o calculado fuera). Ya no se piden los tickets. El del trimestre se obtiene ponderando por facturación, que es aritméticamente el mismo resultado que Σfacturación / Σtickets.
+- **KPI 8**: solo Food Taste or Quality Issues. Los retrasos de preparación quedan fuera.
+- **Pendiente ≠ cero** en el seguimiento a fecha (ver tabla). Evita que el cuadro salga en rojo el 1 de octubre y que la cualitativa hunda Dirección hasta el cierre.
+- **Qué falta para la llave**: para cada bloque troncal por debajo de 90, la app calcula qué tendría que dar cada indicador —él solo, en sus unidades— para encenderla, y descarta lo que exigiría pasar de la excelencia.
+- **Tendencia mensual**, **vista de qué falta por cargar**, **validaciones de rango** al teclear, **impresión del scorecard** y **historial de cambios** por dato.
+- **Hallazgos**: se pueden archivar con motivo para que dejen de arrastrarse; visitas y fichas de cliente misterioso se pueden editar y borrar; los checklists se pueden borrar por semana y hoja.
+- **Checklists**: hoja A ampliada (música, WiFi, LEDs murales, iluminación de sala y exterior por separado, y bloque de barra: cámaras, hielo, fregadero, grifo de cerveza, lavavajillas); hoja B con parrilla sola, tostadora y las cámaras separadas en positivo, congelación y mesas frías.
+- **La reclamación sigue siendo por correo**, en los diez días de la carta: no se hace desde la app.
 
 ## Inconsistencia detectada en v7
 

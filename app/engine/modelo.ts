@@ -60,7 +60,7 @@ export const KPIS: KpiDef[] = [
   { id: 'K6A_MISTERIOSO_SALA', bloque: 'ATENCION', nombre: 'Cliente misterioso: sala y experiencia', tipo: 'P', peso: 4, sentido: 'mayor', unidad: 'nota 1–10', fuente: 'Ficha propia', origen: 'manual' },
   { id: 'K6B_MISTERIOSO_PRODUCTO', bloque: 'ATENCION', nombre: 'Cliente misterioso: producto', tipo: 'P', peso: 1, sentido: 'mayor', unidad: 'nota 1–10', fuente: 'Ficha propia', origen: 'manual' },
   { id: 'K7_PRECISION', bloque: 'OPERACIONES', nombre: 'Precisión del pedido (Inaccurate Orders Rate)', tipo: 'D', peso: 15, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
-  { id: 'K8_COCINA', bloque: 'OPERACIONES', nombre: 'Incidencias imputables a cocina', tipo: 'C', peso: 3, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
+  { id: 'K8_COCINA', bloque: 'OPERACIONES', nombre: 'Incidencias de cocina (sabor y calidad)', tipo: 'C', peso: 3, sentido: 'menor', unidad: '% de pedidos', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K9_DISPONIBILIDAD', bloque: 'OPERACIONES', nombre: 'Disponibilidad del canal (Online Rate)', tipo: 'D', peso: 2, sentido: 'mayor', unidad: 'binario: Online Rate ≥ objetivo', fuente: 'Uber Eats', origen: 'automatico' },
   { id: 'K10_CHECKLIST', bloque: 'MANTENIMIENTO', nombre: 'Fiabilidad del checklist semanal', tipo: 'D', peso: 6, sentido: 'mayor', unidad: '% líneas válidas (peor hoja)', fuente: 'Hojas A y B', origen: 'manual' },
   { id: 'K11_HALLAZGOS', bloque: 'MANTENIMIENTO', nombre: 'Hallazgos cerrados en la visita siguiente', tipo: 'D', peso: 4, sentido: 'mayor', unidad: '% de hallazgos', fuente: 'Hoja de visita', origen: 'manual' },

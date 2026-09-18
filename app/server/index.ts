@@ -42,6 +42,7 @@ function api(c: Ctx): any {
   }
   if (r0 === 'periodos') return repo.periodos(db);
   if (r0 === 'catalogo') return repo.catalogoLineas(db);
+  if (r0 === 'estado' && r1) { requiereDireccion(c); return repo.estadoCarga(db, r1); }
 
   if (r0 === 'resumen' && r1) {
     requiereDireccion(c);
@@ -60,9 +61,10 @@ function api(c: Ctx): any {
   }
 
   // Escrituras del Manager: checklist de su local
-  if (r0 === 'checklist' && r1 && r2 && c.metodo === 'POST') {
+  if (r0 === 'checklist' && r1 && r2 && (c.metodo === 'POST' || c.metodo === 'DELETE')) {
     requiereLocal(c, r1);
-    const b = c.body;
+    const b = c.body ?? {};
+    if (c.metodo === 'DELETE') { repo.borrarChecklist(db, r1, r2, b.semana, b.hoja, autor(c)); return { ok: true }; }
     const id = repo.guardarChecklist(db, r1, r2, b.semana, b.hoja, b.firma_manager ?? null, b.firma_jefe_cocina ?? null, b.lineas ?? []);
     return { ok: true, id };
   }
@@ -80,8 +82,15 @@ function api(c: Ctx): any {
         return { ok: true, importadas: imp.filas.length, columnasNoEncontradas: imp.columnasNoEncontradas };
       }
       repo.guardarUberMes(db, r1, r2, b, autor(c), 'manual'); return { ok: true };
-    case 'visita': return { ok: true, id: repo.guardarVisita(db, r1, r2, b) };
-    case 'ficha': repo.guardarFicha(db, r1, r2, b); return { ok: true };
+    case 'visita':
+      if (c.metodo === 'DELETE') { repo.borrarVisita(db, r1, r2, Number(r3 ?? b.id), autor(c)); return { ok: true }; }
+      if (r3) { repo.actualizarVisita(db, r1, r2, Number(r3), b, autor(c)); return { ok: true }; }
+      return { ok: true, id: repo.guardarVisita(db, r1, r2, b) };
+    case 'hallazgo': repo.archivarHallazgo(db, r1, r2, Number(r3 ?? b.id), autor(c), b.motivo); return { ok: true };
+    case 'ficha':
+      if (c.metodo === 'DELETE') { repo.borrarFicha(db, r1, r2, Number(r3 ?? b.id), autor(c)); return { ok: true }; }
+      if (r3) { repo.actualizarFicha(db, r1, r2, Number(r3), b, autor(c)); return { ok: true }; }
+      repo.guardarFicha(db, r1, r2, b); return { ok: true };
     case 'compromiso':
       if (c.metodo === 'DELETE') { repo.borrarCompromiso(db, r1, r2, Number(r3 ?? b.id)); return { ok: true }; }
       repo.guardarCompromiso(db, r1, r2, b, autor(c)); return { ok: true };
@@ -91,7 +100,7 @@ function api(c: Ctx): any {
     case 'neutralizacion':
       if (c.metodo === 'DELETE') { repo.borrarNeutralizacion(db, Number(r3 ?? b.id)); return { ok: true }; }
       repo.guardarNeutralizacion(db, r1, r2, b, autor(c)); return { ok: true };
-    case 'liquidar': return repo.cerrarLiquidacion(db, r1, r2, b.fecha_extraccion ?? new Date().toISOString().slice(0, 10), autor(c));
+    case 'liquidar': return repo.cerrarLiquidacion(db, r1, r2, b.fecha_extraccion ?? new Date().toISOString().slice(0, 10), autor(c), !!b.forzar);
     case 'vaciar': if (b.confirmar !== r1) throw new HttpError(400, 'Confirmación incorrecta'); repo.vaciarDatos(db, r1, r2); return { ok: true };
   }
   throw new HttpError(404, 'Ruta desconocida');

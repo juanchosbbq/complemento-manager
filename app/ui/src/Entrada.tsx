@@ -40,35 +40,34 @@ function Meses({ localId, periodoId, meses, datos, onCambio }: Props) {
   const [f, setF] = useState<any>(null);
   const v = f ?? ex; const set = (k: string, val: any) => setF({ ...v, [k]: val });
   const reales: [string, string, string][] = [
-    ['facturacion_real', 'Facturación neta del mes (€)', 'Revo, sin IVA. Se suma para el KPI 1 y sirve de numerador del ticket medio.'],
-    ['tickets', 'Nº de tickets del mes', 'Número de comandas/tickets cerrados en Revo. Solo sirve para calcular el ticket medio (facturación ÷ tickets).'],
-    ['productos_penetracion', 'Productos estratégicos (% de la facturación)', 'Peso de la categoría estratégica sobre la facturación del mes.'],
-    ['resenas_volumen', 'Reseñas recibidas en el mes (nº)', 'Joombo. Se suman para el KPI 4a.'],
-    ['resenas_nota_media', 'Nota media de las reseñas del mes', 'Joombo. Se pondera por el nº de reseñas para la nota del trimestre.'],
-  ];
-  const reparto: [string, string, string][] = [
-    ['facturacion_objetivo', 'Facturación prevista del mes (€)', 'Solo para el seguimiento a fecha: reparte el objetivo del trimestre entre los meses según estacionalidad. No cambia los umbrales de la carta.'],
-    ['resenas_objetivo', 'Reseñas previstas del mes (nº)', 'Ídem para las reseñas.'],
+    ['facturacion_real', 'Facturación neta del mes (€)', 'Revo, sin IVA. Se acumula para el KPI 1.'],
+    ['ticket_medio', 'Ticket medio del mes (€)', 'El que da Revo o el que calculéis fuera. El del trimestre se calcula ponderando por facturación.'],
+    ['productos_penetracion', 'Producto estratégico (% de la facturación)', 'Peso de la categoría estratégica sobre la facturación del mes.'],
+    ['resenas_volumen', 'Reseñas recibidas en el mes (nº)', 'Joombo. Se acumulan para el KPI 4a.'],
+    ['resenas_nota_media', 'Nota media de las reseñas del mes (1–5)', 'Se pondera por el nº de reseñas para la nota del trimestre.'],
   ];
   const Campo = ([k, t, ayuda]: [string, string, string]) => (
-    <label key={k} title={ayuda}>{t}<input type="number" step="any" value={v[k] ?? ''} onChange={e => set(k, n(e.target.value))} /><span className="small muted">{ayuda}</span></label>
+    <label key={k}>{t}<input type="number" step="any" value={v[k] ?? ''} onChange={e => set(k, n(e.target.value))} /><span className="small muted">{ayuda}</span></label>
   );
   return (
     <section className="panel">
       <h2>Ventas y reseñas — dato mensual</h2>
-      <p className="small muted">Los umbrales de facturación, ticket y reseñas están en Configuración, en valor absoluto para el trimestre. Aquí solo se cargan los datos reales de cada mes al cerrarlo. {ex.origen && <span className="chip">{ex.origen}</span>}{ex.autor && <span className="chip">{ex.autor}</span>}</p>
+      <p className="small muted">El objetivo es trimestral y está en Configuración, en las unidades de la carta (€, € y nº de reseñas). Aquí solo se cargan los datos reales de cada mes al cerrarlo. {ex.origen && <span className="chip">{ex.origen}</span>}{ex.autor && <span className="chip">{ex.autor}</span>}</p>
       <div className="form" style={{ marginBottom: 12 }}>
         <label>Mes<select value={mes} onChange={e => { setMes(e.target.value); setF(null); }}>{meses.map(m => <option key={m} value={m}>{nombreMes(m)} {m.slice(0, 4)}</option>)}</select></label>
       </div>
-      <h3>Datos reales del mes (al cierre del mes)</h3>
-      <div className="form" style={{ marginBottom: 16 }}>{reales.map(Campo)}</div>
-      <h3>Reparto mensual del objetivo (se fija a T−15, solo para el seguimiento a fecha)</h3>
-      <p className="small muted">Con esto la vista «hasta octubre» compara lo acumulado contra la parte del trimestre que tocaba haber hecho, en vez de contra el trimestre entero. Si se deja vacío, se reparte a partes iguales por meses.</p>
+      <h3>Datos reales del mes</h3>
+      <div className="form" style={{ marginBottom: 18 }}>{reales.map(Campo)}</div>
+      <h3>Meta volante del mes <span className="muted small">(opcional)</span></h3>
+      <p className="small muted">No es un objetivo: el que cuenta es el del trimestre. Sirve solo para repartirlo entre los meses en el seguimiento a fecha — en Q4 importa, porque diciembre pesa mucho más que octubre. Si se deja vacío, se reparte a partes iguales.</p>
       <div className="form">
-        {reparto.map(Campo)}
+        <label>Facturación prevista del mes (€)<input type="number" step="any" value={v.prevision_facturacion ?? ''} onChange={e => set('prevision_facturacion', n(e.target.value))} /></label>
+        <label>Reseñas previstas del mes (nº)<input type="number" step="any" value={v.prevision_resenas ?? ''} onChange={e => set('prevision_resenas', n(e.target.value))} /></label>
         <div className="ancho"><button className="btn" onClick={() => enviar(`mes/${localId}/${periodoId}`, { ...v, mes })}>Guardar {nombreMes(mes)}</button></div>
       </div>
       <Msg />
+      {datos.meses.length > 0 && <table style={{ marginTop: 16 }}><thead><tr><th>Mes</th><th className="n">Facturación</th><th className="n">Ticket medio</th><th className="n">Producto estr.</th><th className="n">Reseñas</th><th className="n">Nota</th><th className="n">Previsión</th></tr></thead>
+        <tbody>{datos.meses.map((m: any) => <tr key={m.mes}><td>{nombreMes(m.mes)}</td><td className="n">{m.facturacion_real ?? '—'}</td><td className="n">{m.ticket_medio ?? '—'}</td><td className="n">{m.productos_penetracion ?? '—'}</td><td className="n">{m.resenas_volumen ?? '—'}</td><td className="n">{m.resenas_nota_media ?? '—'}</td><td className="n">{m.prevision_facturacion ?? <span className="muted">—</span>}</td></tr>)}</tbody></table>}
     </section>
   );
 }
@@ -82,8 +81,7 @@ function Uber({ localId, periodoId, meses, datos, onCambio }: Props) {
   const campos: [string, string, string][] = [
     ['pedidos', 'Pedidos del mes', 'Para ponderar los meses entre sí.'],
     ['inaccurate_rate', 'Inaccurate Orders Rate (%)', 'KPI 7 · Precisión del pedido.'],
-    ['food_quality_rate', 'Food Taste or Quality Issues (%)', 'KPI 8 · se suma con el siguiente.'],
-    ['prep_delay_rate', 'Order Preparation Delays (%)', 'KPI 8 · se suma con el anterior.'],
+    ['food_quality_rate', 'Food Taste or Quality Issues (%)', 'KPI 8 · lo único que se imputa a cocina.'],
     ['online_rate', 'Online Rate (%)', 'KPI 9 · binario: ≥ objetivo cumple, si no, 0 (salvo parada justificada).'],
     ['rating', 'Rating del periodo (1–5)', 'KPI 5 · Feedback → Overview, no Operations.'],
   ];
@@ -126,7 +124,8 @@ function Visita({ localId, periodoId, datos, catalogo, nombre, onCambio }: Props
             <div className="fila-check" key={h.id}>
               <div>{texto(h)} <span className="muted">· detectado el {h.fecha_deteccion} por {h.visitante}</span>{h.descripcion && <div className="small muted">{h.descripcion}</div>}{h.cerrado_en_siguiente === 0 && <span className="chip fuera">no se cerró en la visita siguiente</span>}</div>
               <label className="small"><input type="radio" name={'c' + h.id} checked={cierres[h.id] === true} onChange={() => setCierres({ ...cierres, [h.id]: true })} /> cerrado</label>
-              <label className="small"><input type="radio" name={'c' + h.id} checked={cierres[h.id] === false} onChange={() => setCierres({ ...cierres, [h.id]: false })} /> sigue abierto</label>
+              <span className="small"><label><input type="radio" name={'c' + h.id} checked={cierres[h.id] === false} onChange={() => setCierres({ ...cierres, [h.id]: false })} /> sigue abierto</label>{' '}
+                <button className="btn sec peq" title="Dejar de arrastrarlo (obra aplazada, falsa alarma…). No cambia lo ya puntuado." onClick={() => { const m = prompt('¿Por qué se archiva? (queda registrado)'); if (m !== null) enviar(`hallazgo/${localId}/${periodoId}/${h.id}`, { motivo: m }, 'Hallazgo archivado.'); }}>Archivar</button></span>
             </div>
           ))}
         </>
@@ -146,7 +145,11 @@ function Visita({ localId, periodoId, datos, catalogo, nombre, onCambio }: Props
         <button className="btn" onClick={() => enviar(`visita/${localId}/${periodoId}`, { fecha, visitante, notas, hallazgos, cierres: Object.entries(cierres).map(([id, c]) => ({ hallazgo_id: Number(id), cerrado: c })) }, 'Visita registrada.').then(() => { setHallazgos([]); setCierres({}); setNotas(''); })}>Registrar visita</button>
       </div>
       <Msg />
-      {datos.visitas.length > 0 && <table style={{ marginTop: 14 }}><thead><tr><th>Fecha</th><th>Visitante</th><th>Notas</th><th>Hallazgos</th></tr></thead><tbody>{[...datos.visitas].reverse().map((v: any) => <tr key={v.id}><td>{v.fecha}</td><td>{v.visitante}</td><td className="small">{v.notas || <span className="muted">—</span>}</td><td>{v.hallazgos.length === 0 ? <span className="muted">ninguno</span> : v.hallazgos.map((h: any) => <div key={h.id} className="small">{texto(h)}{h.descripcion ? ` — ${h.descripcion}` : ''}{h.reportado_previamente ? ' · reportado' : ''}{!h.debio_detectarse ? ' · posterior al checklist' : ''}{h.cerrado_fecha ? ` · cerrado el ${h.cerrado_fecha}${h.cerrado_en_siguiente === 1 ? ' (en la visita siguiente)' : ''}` : ' · abierto'}</div>)}</td></tr>)}</tbody></table>}
+      {datos.visitas.length > 0 && <table style={{ marginTop: 14 }}><thead><tr><th>Fecha</th><th>Visitante</th><th>Notas</th><th>Hallazgos</th><th></th></tr></thead><tbody>{[...datos.visitas].reverse().map((v: any) => <tr key={v.id}><td>{v.fecha}</td><td>{v.visitante}</td><td className="small">{v.notas || <span className="muted">—</span>}</td><td>{v.hallazgos.length === 0 ? <span className="muted">ninguno</span> : v.hallazgos.map((h: any) => <div key={h.id} className="small">{texto(h)}{h.descripcion ? ` — ${h.descripcion}` : ''}{h.reportado_previamente ? ' · reportado' : ''}{!h.debio_detectarse ? ' · posterior al checklist' : ''}{h.archivado ? ' · archivado' : h.cerrado_fecha ? ` · cerrado el ${h.cerrado_fecha}${h.cerrado_en_siguiente === 1 ? ' (en la visita siguiente)' : ''}` : ' · abierto'}</div>)}</td>
+        <td style={{ whiteSpace: 'nowrap' }}>
+          <button className="btn sec peq" onClick={() => { const fe = prompt('Fecha (AAAA-MM-DD)', v.fecha); if (!fe) return; const vi = prompt('Visitante', v.visitante) ?? v.visitante; const no = prompt('Notas', v.notas ?? '') ?? v.notas; enviar(`visita/${localId}/${periodoId}/${v.id}`, { fecha: fe, visitante: vi, notas: no }, 'Visita actualizada.'); }}>Editar</button>{' '}
+          <button className="btn sec peq" onClick={() => { if (confirm(`¿Borrar la visita del ${v.fecha} y sus ${v.hallazgos.length} hallazgo(s)?`)) enviar(`visita/${localId}/${periodoId}/${v.id}`, {}, 'Visita borrada.', 'DELETE'); }}>Borrar</button>
+        </td></tr>)}</tbody></table>}
     </section>
   );
 }
@@ -168,7 +171,11 @@ function Ficha({ localId, periodoId, datos, onCambio }: Props) {
         <div className="ancho"><button className="btn" disabled={f.sala === '' || !ok(f.sala) || !ok(f.producto)} onClick={() => enviar(`ficha/${localId}/${periodoId}`, { ...f, sala: Math.round(Number(f.sala) * 10) / 10, producto: f.producto === '' ? null : Math.round(Number(f.producto) * 10) / 10 }, 'Ficha registrada.').then(() => setF({ ...f, sala: '', producto: '', detalle: '' }))}>Registrar ficha</button>{(!ok(f.sala) || !ok(f.producto)) && <span className="estado rojo small"> Las notas van de 1 a 10.</span>}</div>
       </div>
       <Msg />
-      {datos.fichas.length > 0 && <table style={{ marginTop: 14 }}><thead><tr><th>Fecha</th><th>Evaluador</th><th className="n">Sala</th><th className="n">Producto</th><th>Detalle</th></tr></thead><tbody>{datos.fichas.map((x: any) => <tr key={x.id}><td>{x.fecha}</td><td>{x.evaluador}</td><td className="n">{x.sala}</td><td className="n">{x.producto ?? '—'}</td><td className="small">{x.detalle || <span className="muted">—</span>}</td></tr>)}</tbody></table>}
+      {datos.fichas.length > 0 && <table style={{ marginTop: 14 }}><thead><tr><th>Fecha</th><th>Evaluador</th><th className="n">Sala</th><th className="n">Producto</th><th>Detalle</th><th></th></tr></thead><tbody>{datos.fichas.map((x: any) => <tr key={x.id}><td>{x.fecha}</td><td>{x.evaluador}</td><td className="n">{x.sala}</td><td className="n">{x.producto ?? '—'}</td><td className="small">{x.detalle || <span className="muted">—</span>}</td>
+        <td style={{ whiteSpace: 'nowrap' }}>
+          <button className="btn sec peq" onClick={() => { const sa = prompt('Nota de sala (1–10)', String(x.sala)); if (sa === null) return; const pr = prompt('Nota de producto (1–10, vacío si no hubo consumición)', x.producto ?? ''); const de = prompt('Detalle', x.detalle ?? '') ?? x.detalle; enviar(`ficha/${localId}/${periodoId}/${x.id}`, { sala: Number(sa), producto: pr === null || pr === '' ? null : Number(pr), detalle: de }, 'Ficha actualizada.'); }}>Editar</button>{' '}
+          <button className="btn sec peq" onClick={() => { if (confirm(`¿Borrar la ficha del ${x.fecha}?`)) enviar(`ficha/${localId}/${periodoId}/${x.id}`, {}, 'Ficha borrada.', 'DELETE'); }}>Borrar</button>
+        </td></tr>)}</tbody></table>}
     </section>
   );
 }

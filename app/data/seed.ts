@@ -27,8 +27,17 @@ db.exec(`INSERT INTO locales (id, nombre, ciudad, en_modelo, en_piloto, orden) V
     ('local1','MANAGER','L1','Manager Local 1'), ('local2','MANAGER','L2','Manager Local 2'), ('local3','MANAGER','L3','Manager Local 3');`);
 
 // Catálogo de líneas (elementos tipo del §7.1 v7). Ajustar cuando se cierren las hojas A y B.
-const A = ['Climatización', 'Aseos', 'Iluminación', 'TPV y datáfono', 'Mobiliario y terraza', 'Accesos y puertas', 'Rótulos', 'Extintores y señalización'];
-const B = ['Extracción y filtros de campana', 'Sistema de extinción', 'Cámaras y abatidor', 'Ahumador y parrilla', 'Freidoras y termostatos', 'Lavavajillas', 'Arqueta de grasas', 'Desagües'];
+// Hoja A — sala. Pendiente de normalizar del todo (ver PENDIENTE.md); esta es la lista de trabajo.
+const A = [
+  'Climatización', 'Iluminación sala', 'Iluminación exterior', 'LEDs murales', 'Música', 'WiFi',
+  'TPV y datáfono', 'Aseos', 'Mobiliario y terraza', 'Accesos y puertas', 'Rótulos', 'Extintores y señalización',
+  'Barra — Cámaras', 'Barra — Máquina de hielo', 'Barra — Fregadero', 'Barra — Grifo de cerveza', 'Barra — Lavavajillas',
+];
+const B = [
+  'Extracción y filtros de campana', 'Sistema de extinción', 'Parrilla', 'Tostadora',
+  'Cámara de positivo', 'Cámara de congelación', 'Mesas frías', 'Abatidor',
+  'Freidoras y termostatos', 'Lavavajillas', 'Arqueta de grasas', 'Desagües',
+];
 const st = db.prepare('INSERT INTO lineas_catalogo (hoja, linea_id, texto, orden) VALUES (?,?,?,?)');
 A.forEach((t, i) => st.run('A', `A${i + 1}`, t, i + 1));
 B.forEach((t, i) => st.run('B', `B${i + 1}`, t, i + 1));
@@ -59,9 +68,9 @@ if (process.argv.includes('--ejemplo')) {
     { kpi: 'K12B_REPORTES', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
     { kpi: 'K13_CUALITATIVA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
   ], ILU);
-  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) => repo.guardarMes(db, 'L1', 'Q4-2026', { mes, facturacion_objetivo: [85000, 88000, 105000][i], resenas_objetivo: [75, 80, 95][i] }, ILU));
-  repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 87500, facturacion_objetivo: 85000, tickets: 2450, productos_penetracion: 11.2, resenas_volumen: 78, resenas_objetivo: 75, resenas_nota_media: 4.6 }, ILU);
-  repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, prep_delay_rate: 0.06, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
+  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) => repo.guardarMes(db, 'L1', 'Q4-2026', { mes, prevision_facturacion: [85000, 88000, 105000][i], prevision_resenas: [75, 80, 95][i] }, ILU));
+  repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 87500, ticket_medio: 35.7, productos_penetracion: 11.2, resenas_volumen: 78, resenas_nota_media: 4.6, prevision_facturacion: 85000, prevision_resenas: 75 }, ILU);
+  repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
   const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
   for (const s of semanas) {
     repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map((_, i) => ({ linea_id: `A${i + 1}`, estado: 'CONFORME', aviso_en_24h: false })));
@@ -72,6 +81,7 @@ if (process.argv.includes('--ejemplo')) {
   const h1 = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').get(v1) as any).id;
   repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-15', visitante: 'Dirección B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }] });
   repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-10-18', evaluador: 'Conocido 1', sala: 8.5, producto: 8.2, detalle: 'Ficha de ejemplo' });
+  repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-11-06', evaluador: 'Dirección', sala: 8.1, producto: null, detalle: 'Visita fuera de servicio' });
   repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 41', fecha_limite: '2026-10-13', fecha_cumplido: '2026-10-13' }, ILU);
   repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
 }

@@ -46,18 +46,18 @@ CREATE TABLE IF NOT EXISTS niveles (
 -- Bloque 1 y parte del 2: dato mensual (Revo y Joombo). Un registro por mes.
 CREATE TABLE IF NOT EXISTS meses (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL, mes TEXT NOT NULL,
-  facturacion_real REAL, facturacion_objetivo REAL NOT NULL DEFAULT 0,
-  tickets INTEGER, tickets_previstos INTEGER NOT NULL DEFAULT 0, ticket_medio_objetivo REAL NOT NULL DEFAULT 0,
-  productos_penetracion REAL,
-  resenas_volumen INTEGER, resenas_objetivo INTEGER NOT NULL DEFAULT 0, resenas_nota_media REAL,
+  facturacion_real REAL, ticket_medio REAL, productos_penetracion REAL,
+  resenas_volumen INTEGER, resenas_nota_media REAL,
+  -- Meta volante opcional: previsión del reparto del trimestre. Solo afecta al seguimiento a fecha.
+  prevision_facturacion REAL, prevision_resenas INTEGER,
   origen TEXT NOT NULL DEFAULT 'manual', autor TEXT, ts TEXT NOT NULL,
   PRIMARY KEY (local_id, periodo_id, mes)
 );
 -- Bloque 3 y KPI 5: métricas de Uber Eats Manager, verbatim, corte por mes.
 CREATE TABLE IF NOT EXISTS uber_mes (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL, mes TEXT NOT NULL,
-  pedidos INTEGER, inaccurate_rate REAL, food_quality_rate REAL, prep_delay_rate REAL,
-  online_rate REAL, unfulfilled_rate REAL, rating REAL,
+  pedidos INTEGER, inaccurate_rate REAL, food_quality_rate REAL, online_rate REAL, rating REAL,
+  prep_delay_rate REAL, unfulfilled_rate REAL, -- fuera del modelo; se conservan por si vuelven
   origen TEXT NOT NULL DEFAULT 'automatico', fichero TEXT, autor TEXT, ts TEXT NOT NULL,
   PRIMARY KEY (local_id, periodo_id, mes)
 );
@@ -89,7 +89,8 @@ CREATE TABLE IF NOT EXISTS hallazgos (
   reportado_previamente INTEGER NOT NULL DEFAULT 0,  -- el Manager ya lo había avisado: nunca penaliza
   debio_detectarse INTEGER NOT NULL DEFAULT 1,       -- juicio único de la hoja de visita
   cerrado_en_siguiente INTEGER,                       -- NULL = no revisado en la visita siguiente; 1/0 = veredicto en esa visita (es lo que puntúa)
-  cerrado_fecha TEXT                                  -- fecha en que se dio por cerrado, aunque fuera más tarde (seguimiento, no puntúa)
+  cerrado_fecha TEXT,                                 -- fecha en que se dio por cerrado, aunque fuera más tarde (seguimiento, no puntúa)
+  archivado INTEGER NOT NULL DEFAULT 0                -- se deja de arrastrar en la lista de abiertos; no cambia lo ya puntuado
 );
 -- KPI 6
 CREATE TABLE IF NOT EXISTS fichas_misterioso (
@@ -136,6 +137,13 @@ CREATE TABLE IF NOT EXISTS liquidaciones (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL, fecha_extraccion TEXT NOT NULL,
   resultado TEXT NOT NULL, cerrada_por TEXT NOT NULL, ts TEXT NOT NULL, PRIMARY KEY (local_id, periodo_id)
 );
+-- Rastro de cambios: en un sistema que decide dinero, hay que poder decir qué valía un dato antes.
+CREATE TABLE IF NOT EXISTS historial (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, local_id TEXT NOT NULL, periodo_id TEXT NOT NULL,
+  entidad TEXT NOT NULL, clave TEXT NOT NULL, antes TEXT, despues TEXT, autor TEXT, ts TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_historial ON historial (local_id, periodo_id, entidad, clave);
+
 CREATE TABLE IF NOT EXISTS accesos (
   token TEXT PRIMARY KEY, rol TEXT NOT NULL CHECK (rol IN ('DIRECCION','MANAGER')),
   local_id TEXT, nombre TEXT NOT NULL, activo INTEGER NOT NULL DEFAULT 1
@@ -156,6 +164,10 @@ export function abrir(ruta = process.env.INCENTIVOS_DB ?? new URL('./incentivos.
     'ALTER TABLE config_periodo ADD COLUMN fecha_alta TEXT',
     'ALTER TABLE config_periodo ADD COLUMN fecha_baja TEXT',
     'ALTER TABLE config_periodo ADD COLUMN dias_it INTEGER NOT NULL DEFAULT 0',
+    'ALTER TABLE meses ADD COLUMN ticket_medio REAL',
+    'ALTER TABLE meses ADD COLUMN prevision_facturacion REAL',
+    'ALTER TABLE meses ADD COLUMN prevision_resenas INTEGER',
+    'ALTER TABLE hallazgos ADD COLUMN archivado INTEGER NOT NULL DEFAULT 0',
   ]) { try { db.exec(sql); } catch { /* ya existía */ } }
   return db;
 }

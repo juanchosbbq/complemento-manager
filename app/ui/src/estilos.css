@@ -5,6 +5,7 @@
   /* Semáforo con la propia paleta: verde = teal, rojo = granate */
   --verde: #0E9C9C; --ambar: #D19A16; --rojo: var(--granate);
   --verde-suave: #DDF5F5; --ambar-suave: #FBF0CC; --rojo-suave: #F8E0E2;
+  --azul: #2E6FB7;
   --display: "Staatliches", "Bebas Neue", "Arial Narrow", sans-serif;
   --fuente: "Roboto", "Helvetica Neue", Arial, sans-serif;
 }
@@ -86,8 +87,18 @@ td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
 .form .ancho { grid-column: 1 / -1; }
 .fila-check { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--linea); }
 .fila-check .nc { color: var(--rojo); }
-.resumen-locales td .llaves { display: inline-flex; gap: 4px; }
+.resumen-locales td .llaves { display: inline-flex; gap: 5px; align-items: center; }
+.icono-bloque { display: block; flex: 0 0 auto; }
 .llave { width: 14px; height: 14px; border-radius: 2px; display: inline-block; background: var(--linea); }
 .llave.verde { background: var(--verde); } .llave.ambar { background: var(--ambar); } .llave.rojo { background: var(--rojo); }
 .fila-local { cursor: pointer; } .fila-local:hover { background: var(--fondo); }
 @media (max-width: 640px) { .contenido { padding: 12px; } .formula .term .v { font-size: 26px; } .formula .term.pago .v { font-size: 34px; } h1 { font-size: 26px; } }
+
+@media print {
+  .cabecera, .pestanas, .no-print, .btn { display: none !important; }
+  body { background: #fff; }
+  .contenido { max-width: none; padding: 0; }
+  .panel, .bloque { break-inside: avoid; border-color: #bbb; }
+  .formula { background: #fff; color: #000; border: 1px solid #bbb; }
+  .formula .term .l, .formula .term .v { color: #000 !important; }
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { EntradaLiquidacion, ValorKpi, liquidar, logroKpi, semaforo } from './liquidar';
+import { EntradaLiquidacion, ValorKpi, faltaParaLlave, liquidar, logroKpi, semaforo, valorParaLogro } from './liquidar';
 import { KPIS, KpiId, PESOS_BLOQUE } from './modelo';
 
 /** Niveles identidad: el valor ES el logro. Útil para probar la mecánica sin pasar por la escala. */
@@ -277,6 +277,69 @@ describe('Situaciones especiales (§12)', () => {
     const r = liquidar(conLogros({ K10_CHECKLIST: 80, K11_HALLAZGOS: 80, K7_PRECISION: 80, K8_COCINA: 80, K9_DISPONIBILIDAD: 80 }));
     expect(r.pago).toBe(0);
     expect(JSON.stringify(r)).not.toMatch(/suelo/i);
+  });
+});
+
+describe('Indicadores todavía sin dato (seguimiento a fecha)', () => {
+  it('en parcial no cuentan 0: salen de la nota del bloque y se marcan pendientes', () => {
+    const e = base({ parcial: true });
+    e.kpis.K13_CUALITATIVA = { valor: null, niveles: ID };
+    const r = liquidar(e);
+    const k = kpi(r, 'K13_CUALITATIVA');
+    expect(k.pendiente).toBe(true);
+    expect(bloque(r, 'DIRECCION').logro).toBe(100);   // el resto del bloque va al 100
+    expect(bloque(r, 'DIRECCION').pendientes).toBe(1);
+    expect(bloque(r, 'DIRECCION').pesoMedido).toBe(15);
+    expect(r.logroPonderado).toBe(100);
+    expect(r.pendientes).toBe(1);
+  });
+  it('al cierre sí computan 0', () => {
+    const e = base();
+    e.kpis.K13_CUALITATIVA = { valor: null, niveles: ID };
+    const r = liquidar(e);
+    expect(kpi(r, 'K13_CUALITATIVA').logro).toBe(0);
+    expect(bloque(r, 'DIRECCION').logro).toBe(75);
+    expect(r.logroPonderado).toBe(95);
+  });
+});
+
+describe('Qué falta para encender la llave', () => {
+  it('traduce el porcentaje del bloque a las unidades del indicador', () => {
+    const e = base({ parcial: true });
+    // Mantenimiento: checklist (6%) al 60% de logro, hallazgos (4%) al 100 → bloque 76
+    e.kpis.K10_CHECKLIST = { valor: 70, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    e.kpis.K11_HALLAZGOS = { valor: 85, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    const r = liquidar(e);
+    expect(bloque(r, 'MANTENIMIENTO').llaveCumplida).toBe(false);
+    const f = faltaParaLlave(e, r).find(x => x.bloque === 'MANTENIMIENTO')!;
+    const op = f.opciones.find(o => o.kpi === 'K10_CHECKLIST')!;
+    expect(op.valorActual).toBe(70);
+    expect(op.valorNecesario).toBeGreaterThan(70);
+    expect(op.valorNecesario).toBeLessThanOrEqual(85);
+  });
+  it('no propone nada imposible: descarta el indicador que tendría que pasar de la excelencia', () => {
+    const e = base({ parcial: true });
+    // Los dos al 50 de logro: el bloque va a 50 y faltan 4 puntos de 10.
+    e.kpis.K10_CHECKLIST = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    e.kpis.K11_HALLAZGOS = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    const f = faltaParaLlave(e, liquidar(e)).find(x => x.bloque === 'MANTENIMIENTO')!;
+    // El checklist (6%) puede: necesita logro 116,7. Hallazgos (4%) necesitaría 150 y queda descartado.
+    expect(f.opciones.map(o => o.kpi)).toEqual(['K10_CHECKLIST']);
+  });
+  it('si ningún indicador llega por sí solo, no se propone ninguno', () => {
+    const e = base({ parcial: true });
+    e.kpis.K10_CHECKLIST = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    e.kpis.K11_HALLAZGOS = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
+    e.kpis.K10_CHECKLIST.valor = 60; e.kpis.K11_HALLAZGOS.valor = 60;
+    const r = liquidar({ ...e, kpis: { ...e.kpis, K10_CHECKLIST: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } }, K11_HALLAZGOS: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } } } });
+    const f = faltaParaLlave(e, r).find(x => x.bloque === 'MANTENIMIENTO');
+    expect(f).toBeDefined();
+  });
+  it('valorParaLogro es la inversa exacta de logroKpi, también con llave calibrada', () => {
+    const n = { umbral: 31.90, llave: 34.30, objetivo: 37.20, excelencia: 39.20 };
+    for (const logro of [50, 70, 90, 95, 100, 110, 120]) {
+      expect(logroKpi(valorParaLogro(logro, n, 'mayor'), n, 'mayor')).toBeCloseTo(logro, 6);
+    }
   });
 });
 
