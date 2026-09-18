@@ -7,11 +7,72 @@
 import { abrir } from './db';
 import * as repo from './repo';
 
+/**
+ * Catálogo de checklist — hojas A (sala) y B (cocina). Pendiente de normalizar del todo con
+ * operaciones (ver PENDIENTE.md); esta es la lista de trabajo, actualizada el 18-sep-2026.
+ *
+ * El id de cada línea es FIJO y no se deriva de la posición en el array: así, insertar una línea
+ * nueva en medio de la lista (como "Iluminación sala") nunca cambia el significado de un id que ya
+ * pueda estar guardado en un checklist real de un local. Para añadir una línea, se añade una fila
+ * nueva con un id propio; para quitar una, se borra su fila (el histórico que la use sigue
+ * mostrando su texto tal cual, por el id). Nunca reordenar ni reutilizar un id ya usado.
+ */
+const A: [string, string][] = [
+  ['A_clima', 'Climatización'],
+  ['A_ilum_sala', 'Iluminación sala'],
+  ['A_ilum_ext', 'Iluminación exterior'],
+  ['A_leds', 'LEDs murales'],
+  ['A_musica', 'Música'],
+  ['A_wifi', 'WiFi'],
+  ['A_tpv', 'TPV y datáfono'],
+  ['A_aseos', 'Aseos'],
+  ['A_mobiliario', 'Mobiliario y terraza'],
+  ['A_accesos', 'Accesos y puertas'],
+  ['A_rotulos', 'Rótulos'],
+  ['A_extintores', 'Extintores y señalización'],
+  ['A_barra_camaras', 'Barra — Cámaras'],
+  ['A_barra_hielo', 'Barra — Máquina de hielo'],
+  ['A_barra_fregadero', 'Barra — Fregadero'],
+  ['A_barra_grifo', 'Barra — Grifo de cerveza'],
+  ['A_barra_lavavajillas', 'Barra — Lavavajillas'],
+];
+const B: [string, string][] = [
+  ['B_campana', 'Extracción y filtros de campana'],
+  ['B_extincion', 'Sistema de extinción'],
+  ['B_parrilla', 'Parrilla'],
+  ['B_tostadora', 'Tostadora'],
+  ['B_camara_positivo', 'Cámara de positivo'],
+  ['B_camara_congelacion', 'Cámara de congelación'],
+  ['B_mesas_frias', 'Mesas frías'],
+  ['B_abatidor', 'Abatidor'],
+  ['B_freidoras', 'Freidoras y termostatos'],
+  ['B_lavavajillas', 'Lavavajillas'],
+  ['B_arqueta', 'Arqueta de grasas'],
+  ['B_desagues', 'Desagües'],
+];
+
 const db = abrir();
 const ILU = 'ILUSTRATIVO';
+
+/**
+ * El catálogo de checklist se resincroniza SIEMPRE, en cada arranque (esté la base vacía o ya
+ * en producción), para que un cambio de nombre o una línea nueva en este fichero baste con hacer
+ * commit + push — sin --forzar y sin tocar configuración, umbrales, ni ningún otro dato ya cargado.
+ * Va antes de decidir si hace falta el resto del sembrado, precisamente para que corra siempre.
+ */
+function sincronizarCatalogo() {
+  db.exec('DELETE FROM lineas_catalogo');
+  const st = db.prepare('INSERT INTO lineas_catalogo (hoja, linea_id, texto, orden) VALUES (?,?,?,?)');
+  A.forEach(([id, t], i) => st.run('A', id, t, i + 1));
+  B.forEach(([id, t], i) => st.run('B', id, t, i + 1));
+  console.log(`Catálogo de checklist sincronizado: ${A.length} líneas en A, ${B.length} en B.`);
+}
+
 const sinDatos = (db.prepare('SELECT COUNT(*) AS n FROM locales').get() as any).n === 0;
 if (!sinDatos && !process.argv.includes('--forzar')) {
-  console.log('La base ya tiene datos. Usa --forzar para resembrar (borra todo).'); process.exit(0);
+  sincronizarCatalogo();
+  console.log('Resto de la base ya tenía datos: sin tocar. (Usa --forzar para resembrar todo lo demás desde cero — borra configuración y datos.)');
+  process.exit(0);
 }
 db.exec(`DELETE FROM liquidaciones; DELETE FROM neutralizaciones; DELETE FROM puertas; DELETE FROM coste_personal_mes; DELETE FROM descuentos_mes; DELETE FROM cualitativa;
   DELETE FROM compromisos; DELETE FROM fichas_misterioso; DELETE FROM hallazgos; DELETE FROM visitas; DELETE FROM checklist_lineas; DELETE FROM checklist_semanas;
@@ -26,21 +87,7 @@ db.exec(`INSERT INTO locales (id, nombre, ciudad, en_modelo, en_piloto, orden) V
   INSERT INTO accesos (token, rol, local_id, nombre) VALUES ('direccion','DIRECCION',NULL,'Dirección'),
     ('local1','MANAGER','L1','Manager Local 1'), ('local2','MANAGER','L2','Manager Local 2'), ('local3','MANAGER','L3','Manager Local 3');`);
 
-// Catálogo de líneas (elementos tipo del §7.1 v7). Ajustar cuando se cierren las hojas A y B.
-// Hoja A — sala. Pendiente de normalizar del todo (ver PENDIENTE.md); esta es la lista de trabajo.
-const A = [
-  'Climatización', 'Iluminación sala', 'Iluminación exterior', 'LEDs murales', 'Música', 'WiFi',
-  'TPV y datáfono', 'Aseos', 'Mobiliario y terraza', 'Accesos y puertas', 'Rótulos', 'Extintores y señalización',
-  'Barra — Cámaras', 'Barra — Máquina de hielo', 'Barra — Fregadero', 'Barra — Grifo de cerveza', 'Barra — Lavavajillas',
-];
-const B = [
-  'Extracción y filtros de campana', 'Sistema de extinción', 'Parrilla', 'Tostadora',
-  'Cámara de positivo', 'Cámara de congelación', 'Mesas frías', 'Abatidor',
-  'Freidoras y termostatos', 'Lavavajillas', 'Arqueta de grasas', 'Desagües',
-];
-const st = db.prepare('INSERT INTO lineas_catalogo (hoja, linea_id, texto, orden) VALUES (?,?,?,?)');
-A.forEach((t, i) => st.run('A', `A${i + 1}`, t, i + 1));
-B.forEach((t, i) => st.run('B', `B${i + 1}`, t, i + 1));
+sincronizarCatalogo();
 
 // ---- Configuración base por local: importe y parámetros ya decididos; los umbrales se cargan desde la carta de cada local ----
 for (const l of ['L1', 'L2', 'L3']) {
@@ -73,11 +120,11 @@ if (process.argv.includes('--ejemplo')) {
   repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
   const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
   for (const s of semanas) {
-    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map((_, i) => ({ linea_id: `A${i + 1}`, estado: 'CONFORME', aviso_en_24h: false })));
+    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map(([id]) => ({ linea_id: id, estado: 'CONFORME', aviso_en_24h: false })));
     repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'B', 'Manager Local 1', 'Jefe de Cocina 1',
-      B.map((_, i) => ({ linea_id: `B${i + 1}`, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
+      B.map(([id], i) => ({ linea_id: id, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
   }
-  const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-08', visitante: 'Dirección A', notas: 'Visita de ejemplo', hallazgos: [{ hoja: 'B', linea_id: 'B7', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true }] });
+  const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-08', visitante: 'Dirección A', notas: 'Visita de ejemplo', hallazgos: [{ hoja: 'B', linea_id: 'B_arqueta', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true }] });
   const h1 = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').get(v1) as any).id;
   repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-15', visitante: 'Dirección B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }] });
   repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-10-18', evaluador: 'Conocido 1', sala: 8.5, producto: 8.2, detalle: 'Ficha de ejemplo' });
