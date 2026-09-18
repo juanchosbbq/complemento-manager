@@ -20,8 +20,8 @@ function Login({ onOk }: { onOk: (y: Yo) => void }) {
   const entrar = async () => { try { setToken(t); onOk(await post<Yo>('login', { token: t })); } catch (e: any) { setToken(''); setErr(e.message); } };
   return (
     <div className="login">
-      <h1>Complemento de Manager</h1>
-      <p className="muted">Juancho's BBQ · seguimiento del complemento de puesto</p>
+      <h1>Juancho's <b>BBQ</b></h1>
+      <p className="muted">Complemento de puesto de Manager · seguimiento</p>
       <input placeholder="Código de acceso" value={t} onChange={e => setT(e.target.value)} onKeyDown={e => e.key === 'Enter' && entrar()} autoFocus />
       {err && <div className="error">{err}</div>}
       <button className="btn" onClick={entrar}>Entrar</button>
@@ -50,7 +50,7 @@ function Shell({ yo, salir }: { yo: Yo; salir: () => void }) {
   return (
     <>
       <header className="cabecera">
-        <span className="marca">Juancho's BBQ · Complemento de Manager</span>
+        <span className="marca">Juancho's <b>BBQ</b> · Complemento de Manager</span>
         <span className="sep" />
         {periodos.length > 1 && <select value={periodoId} onChange={e => setPeriodoId(e.target.value)}>{periodos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>}
         {periodo && <select value={hasta} onChange={e => setHasta(e.target.value)} aria-label="Corte">{periodo.meses.map((m: string) => <option key={m} value={m}>hasta {nombreMes(m)}</option>)}<option value="">trimestre completo</option></select>}
