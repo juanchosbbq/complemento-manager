@@ -144,6 +144,20 @@ CREATE TABLE IF NOT EXISTS historial (
 );
 CREATE INDEX IF NOT EXISTS idx_historial ON historial (local_id, periodo_id, entidad, clave);
 
+-- Usuarios con correo y contraseña. La contraseña se guarda como hash scrypt con sal propia, nunca en claro.
+CREATE TABLE IF NOT EXISTS usuarios (
+  email TEXT PRIMARY KEY, nombre TEXT NOT NULL,
+  rol TEXT NOT NULL CHECK (rol IN ('DIRECCION','MANAGER')), local_id TEXT,
+  hash TEXT NOT NULL, sal TEXT NOT NULL,
+  activo INTEGER NOT NULL DEFAULT 1, debe_cambiar INTEGER NOT NULL DEFAULT 0,
+  creado_por TEXT, ts TEXT NOT NULL, ultimo_acceso TEXT
+);
+-- Sesiones: un token aleatorio por inicio de sesión, con caducidad. Cerrar sesión lo borra.
+CREATE TABLE IF NOT EXISTS sesiones (
+  token TEXT PRIMARY KEY, email TEXT NOT NULL REFERENCES usuarios(email) ON DELETE CASCADE,
+  creada TEXT NOT NULL, caduca TEXT NOT NULL
+);
+-- Tabla antigua de códigos compartidos: se conserva vacía por compatibilidad, ya no se usa para entrar.
 CREATE TABLE IF NOT EXISTS accesos (
   token TEXT PRIMARY KEY, rol TEXT NOT NULL CHECK (rol IN ('DIRECCION','MANAGER')),
   local_id TEXT, nombre TEXT NOT NULL, activo INTEGER NOT NULL DEFAULT 1

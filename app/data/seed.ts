@@ -6,6 +6,7 @@
  */
 import { abrir } from './db';
 import * as repo from './repo';
+import { asegurarAdminInicial } from './auth';
 
 /**
  * Catálogo de checklist — hojas A (sala) y B (cocina). Pendiente de normalizar del todo con
@@ -68,15 +69,23 @@ function sincronizarCatalogo() {
   console.log(`Catálogo de checklist sincronizado: ${A.length} líneas en A, ${B.length} en B.`);
 }
 
+function asegurarAdmin() {
+  const a = asegurarAdminInicial(db);
+  if (a) console.log(a.generada
+    ? `\n>>> PRIMER ADMINISTRADOR creado: ${a.email}\n>>> Contraseña temporal (solo se muestra esta vez, cámbiala al entrar): ${a.password}\n`
+    : `Primer administrador creado: ${a.email} (contraseña de ADMIN_PASSWORD; se pedirá cambiarla al entrar).`);
+}
+
 const sinDatos = (db.prepare('SELECT COUNT(*) AS n FROM locales').get() as any).n === 0;
 if (!sinDatos && !process.argv.includes('--forzar')) {
   sincronizarCatalogo();
+  asegurarAdmin();
   console.log('Resto de la base ya tenía datos: sin tocar. (Usa --forzar para resembrar todo lo demás desde cero — borra configuración y datos.)');
   process.exit(0);
 }
 db.exec(`DELETE FROM liquidaciones; DELETE FROM neutralizaciones; DELETE FROM puertas; DELETE FROM coste_personal_mes; DELETE FROM descuentos_mes; DELETE FROM cualitativa;
   DELETE FROM compromisos; DELETE FROM fichas_misterioso; DELETE FROM hallazgos; DELETE FROM visitas; DELETE FROM checklist_lineas; DELETE FROM checklist_semanas;
-  DELETE FROM uber_mes; DELETE FROM meses; DELETE FROM niveles; DELETE FROM config_periodo; DELETE FROM lineas_catalogo; DELETE FROM managers; DELETE FROM accesos; DELETE FROM periodos; DELETE FROM locales;`);
+  DELETE FROM uber_mes; DELETE FROM meses; DELETE FROM niveles; DELETE FROM config_periodo; DELETE FROM lineas_catalogo; DELETE FROM managers; DELETE FROM accesos; DELETE FROM sesiones; DELETE FROM usuarios; DELETE FROM periodos; DELETE FROM locales;`);
 
 // ---- Maestros ----
 db.exec(`INSERT INTO locales (id, nombre, ciudad, en_modelo, en_piloto, orden) VALUES
@@ -84,8 +93,8 @@ db.exec(`INSERT INTO locales (id, nombre, ciudad, en_modelo, en_piloto, orden) V
   ('VLL','Valladolid','Valladolid',0,0,99);
   INSERT INTO managers (id, nombre, local_id, fecha_alta_puesto) VALUES ('M1','Manager Local 1','L1',NULL), ('M2','Manager Local 2','L2','2026-10-01'), ('M3','Manager Local 3','L3',NULL);
   INSERT INTO periodos (id, nombre, inicio, fin, meses) VALUES ('Q4-2026','Q4 2026','2026-10-01','2026-12-31','["2026-10","2026-11","2026-12"]');
-  INSERT INTO accesos (token, rol, local_id, nombre) VALUES ('direccion','DIRECCION',NULL,'Dirección'),
-    ('local1','MANAGER','L1','Manager Local 1'), ('local2','MANAGER','L2','Manager Local 2'), ('local3','MANAGER','L3','Manager Local 3');`);
+  DELETE FROM accesos;`);
+asegurarAdmin();
 
 sincronizarCatalogo();
 
@@ -133,4 +142,4 @@ if (process.argv.includes('--ejemplo')) {
   repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
 }
 
-console.log('Sembrado. Accesos: direccion · local1 · local2 · local3. Los umbrales se cargan desde la carta de cada local (Configuración).' + (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''));
+console.log('Sembrado. Los usuarios se gestionan desde Dirección → Usuarios. Los umbrales se cargan desde la carta de cada local (Configuración).' + (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''));

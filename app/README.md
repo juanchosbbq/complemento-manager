@@ -13,7 +13,15 @@ npm run build     # compila la interfaz en ui/dist
 npm start         # http://localhost:8787
 ```
 
-Códigos de acceso sembrados (provisionales, ver PENDIENTE.md): `direccion`, `local1`, `local2`, `local3`.
+## Acceso: correo y contraseña
+
+Ya no hay códigos compartidos. Cada persona entra con su correo y su contraseña, y los usuarios los gestiona Dirección desde el botón **Usuarios** de la cabecera (crear, editar rol y local, restablecer contraseña, quitar o reactivar el acceso, borrar).
+
+**Primer arranque.** Si no existe ningún usuario, `npm run seed` (que corre en cada arranque del contenedor) crea el primer administrador:
+- correo: `ADMIN_EMAIL` si está definida, si no `juancho@equipojuanchos.com`;
+- contraseña: `ADMIN_PASSWORD` si está definida en las variables del servicio (recomendado); si no, se genera una aleatoria y **se imprime una sola vez en el log del despliegue**.
+
+Al entrar por primera vez, o tras un restablecimiento, la app obliga a elegir una contraseña propia. Reglas: 10 caracteres mínimo, letras y números. Cinco intentos fallidos bloquean el correo 15 minutos. Las sesiones caducan a los 30 días; quitar el acceso, restablecer la contraseña o cerrar sesión las invalida al momento.
 
 Desarrollo: `npm run dev` levanta Vite en 5173 con proxy a la API (arrancar también `npm start`). `npm test` ejecuta los 57 tests; `npm run typecheck`, TypeScript.
 

@@ -4,7 +4,7 @@ import { Detalle } from './Detalle';
 import { Checklist } from './Checklist';
 import { Entrada } from './Entrada';
 
-type Yo = { rol: 'DIRECCION' | 'MANAGER'; local_id: string | null; nombre: string };
+type Yo = { rol: 'DIRECCION' | 'MANAGER'; local_id: string | null; nombre: string; email: string; debe_cambiar?: boolean };
 
 export function App() {
   const [yo, setYo] = useState<Yo | null>(null);
@@ -16,20 +16,103 @@ export function App() {
 }
 
 function Login({ onOk }: { onOk: (y: Yo) => void }) {
-  const [t, setT] = useState(''); const [err, setErr] = useState('');
-  const entrar = async () => { try { setToken(t); onOk(await post<Yo>('login', { token: t })); } catch (e: any) { setToken(''); setErr(e.message); } };
+  const [email, setEmail] = useState(''); const [pw, setPw] = useState(''); const [err, setErr] = useState(''); const [cargando, setCargando] = useState(false);
+  const entrar = async () => {
+    setErr(''); setCargando(true);
+    try { setToken(''); const r = await post<{ token: string; usuario: Yo }>('login', { email, password: pw }); setToken(r.token); onOk(r.usuario); }
+    catch (e: any) { setErr(e.message); } finally { setCargando(false); }
+  };
   return (
     <div className="login">
       <h1>Juancho's <b>BBQ</b></h1>
       <p className="muted">Complemento de puesto de Manager · seguimiento</p>
-      <input placeholder="Código de acceso" value={t} onChange={e => setT(e.target.value)} onKeyDown={e => e.key === 'Enter' && entrar()} autoFocus />
+      <input type="email" placeholder="Correo" autoComplete="username" value={email} onChange={e => setEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && entrar()} autoFocus />
+      <input type="password" placeholder="Contraseña" autoComplete="current-password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && entrar()} />
       {err && <div className="error">{err}</div>}
-      <button className="btn" onClick={entrar}>Entrar</button>
+      <button className="btn" onClick={entrar} disabled={cargando || !email || !pw}>Entrar</button>
+      <p className="small muted" style={{ marginTop: 14 }}>Si no tienes acceso o has olvidado la contraseña, pídeselo a Dirección.</p>
     </div>
   );
 }
 
-function Shell({ yo, salir }: { yo: Yo; salir: () => void }) {
+function CambiarPassword({ yo, obligatorio, onHecho }: { yo: Yo; obligatorio: boolean; onHecho: () => void }) {
+  const [actual, setActual] = useState(''); const [nueva, setNueva] = useState(''); const [rep, setRep] = useState(''); const [msg, setMsg] = useState('');
+  const guardar = async () => {
+    setMsg('');
+    if (nueva !== rep) { setMsg('Las dos contraseñas nuevas no coinciden'); return; }
+    try { await post('mi-password', { actual, nueva }); onHecho(); } catch (e: any) { setMsg(e.message); }
+  };
+  return (
+    <div className="login">
+      <h2>{obligatorio ? 'Elige tu contraseña' : 'Cambiar contraseña'}</h2>
+      <p className="small muted">{obligatorio ? 'Es tu primera entrada o Dirección te ha restablecido la contraseña: elige una tuya para seguir.' : 'Mínimo 10 caracteres, con letras y números.'} Sesión de {yo.email}.</p>
+      <input type="password" placeholder="Contraseña actual" autoComplete="current-password" value={actual} onChange={e => setActual(e.target.value)} />
+      <input type="password" placeholder="Nueva contraseña (10+ caracteres, letras y números)" autoComplete="new-password" value={nueva} onChange={e => setNueva(e.target.value)} />
+      <input type="password" placeholder="Repite la nueva" autoComplete="new-password" value={rep} onChange={e => setRep(e.target.value)} onKeyDown={e => e.key === 'Enter' && guardar()} />
+      {msg && <div className="error">{msg}</div>}
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button className="btn" onClick={guardar} disabled={!actual || !nueva || !rep}>Guardar</button>
+        {!obligatorio && <button className="btn sec" onClick={onHecho}>Cancelar</button>}
+      </div>
+    </div>
+  );
+}
+
+function Usuarios({ locales, yo }: { locales: any[]; yo: Yo }) {
+  const [lista, setLista] = useState<any[]>([]);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const vacio = { email: '', nombre: '', rol: 'MANAGER', local_id: locales[0]?.id ?? '', password: '' };
+  const [f, setF] = useState<any>(vacio);
+  const cargar = () => api('usuarios').then(setLista).catch(e => setMsg({ tipo: 'error', texto: e.message }));
+  useEffect(() => { cargar(); }, []);
+  const hacer = async (fn: () => Promise<any>, ok: string) => { setMsg(null); try { await fn(); setMsg({ tipo: 'ok', texto: ok }); cargar(); } catch (e: any) { setMsg({ tipo: 'error', texto: e.message }); } };
+  const nombreLocal = (id: string | null) => locales.find(l => l.id === id)?.nombre ?? id ?? '—';
+  return (
+    <>
+      <section className="panel">
+        <h2>Nuevo usuario</h2>
+        <p className="small muted">El usuario entra con su correo y esta contraseña, y la app le pedirá cambiarla la primera vez. Dirección ve todo; un Manager solo ve su local.</p>
+        <div className="form">
+          <label>Correo<input type="email" value={f.email} onChange={e => setF({ ...f, email: e.target.value })} placeholder="nombre@equipojuanchos.com" /></label>
+          <label>Nombre<input value={f.nombre} onChange={e => setF({ ...f, nombre: e.target.value })} /></label>
+          <label>Rol<select value={f.rol} onChange={e => setF({ ...f, rol: e.target.value })}><option value="MANAGER">Manager</option><option value="DIRECCION">Dirección</option></select></label>
+          {f.rol === 'MANAGER' && <label>Local<select value={f.local_id} onChange={e => setF({ ...f, local_id: e.target.value })}>{locales.map(l => <option key={l.id} value={l.id}>{l.nombre}</option>)}</select></label>}
+          <label>Contraseña inicial<input type="text" autoComplete="off" value={f.password} onChange={e => setF({ ...f, password: e.target.value })} placeholder="10+ caracteres, letras y números" /></label>
+          <div><button className="btn" disabled={!f.email || !f.nombre || !f.password} onClick={() => hacer(() => post('usuarios', { ...f, debe_cambiar: true }), `Usuario ${f.email} creado. Pásale la contraseña inicial por un canal seguro.`).then(() => setF(vacio))}>Crear</button></div>
+        </div>
+        {msg && <div className={msg.tipo}>{msg.texto}</div>}
+      </section>
+      <section className="panel">
+        <h2>Usuarios con acceso</h2>
+        <table>
+          <thead><tr><th>Correo</th><th>Nombre</th><th>Rol</th><th>Local</th><th>Estado</th><th>Último acceso</th><th></th></tr></thead>
+          <tbody>{lista.map(u => (
+            <tr key={u.email} style={u.activo ? undefined : { opacity: .55 }}>
+              <td>{u.email}{u.email === yo.email && <span className="chip"> tú</span>}</td>
+              <td>{u.nombre}</td>
+              <td>{u.rol === 'DIRECCION' ? 'Dirección' : 'Manager'}</td>
+              <td>{u.rol === 'MANAGER' ? nombreLocal(u.local_id) : '—'}</td>
+              <td>{u.activo ? (u.debe_cambiar ? <span className="estado ambar">debe cambiar contraseña</span> : <span className="estado verde">activo</span>) : <span className="estado rojo">sin acceso</span>}</td>
+              <td className="small">{u.ultimo_acceso ? String(u.ultimo_acceso).slice(0, 16).replace('T', ' ') : <span className="muted">nunca</span>}</td>
+              <td style={{ whiteSpace: 'nowrap' }}>
+                <button className="btn sec peq" onClick={() => { const nombre = prompt('Nombre', u.nombre); if (nombre === null) return; const rol = prompt('Rol: MANAGER o DIRECCION', u.rol); if (rol === null) return; let local_id = u.local_id; if (rol === 'MANAGER') { local_id = prompt(`Local (${locales.map(l => l.id).join(', ')})`, u.local_id ?? locales[0]?.id) ?? u.local_id; } hacer(() => post(`usuarios/${encodeURIComponent(u.email)}`, { nombre, rol, local_id }), 'Usuario actualizado.'); }}>Editar</button>{' '}
+                <button className="btn sec peq" onClick={() => { const p = prompt(`Nueva contraseña para ${u.email} (10+ caracteres, letras y números). Se le pedirá cambiarla al entrar.`); if (p) hacer(() => post(`usuarios/${encodeURIComponent(u.email)}/password`, { password: p }), 'Contraseña restablecida; sus sesiones abiertas se han cerrado.'); }}>Restablecer</button>{' '}
+                {u.activo
+                  ? <button className="btn sec peq" onClick={() => { if (confirm(`¿Quitar el acceso a ${u.email}? Podrás reactivarlo después.`)) hacer(() => post(`usuarios/${encodeURIComponent(u.email)}`, { activo: false }), 'Acceso retirado.'); }}>Quitar acceso</button>
+                  : <button className="btn sec peq" onClick={() => hacer(() => post(`usuarios/${encodeURIComponent(u.email)}`, { activo: true }), 'Acceso reactivado.')}>Reactivar</button>}{' '}
+                <button className="btn sec peq" onClick={() => { if (confirm(`¿Borrar definitivamente a ${u.email}?`)) hacer(() => api(`usuarios/${encodeURIComponent(u.email)}`, { method: 'DELETE', body: {} }), 'Usuario borrado.'); }}>Borrar</button>
+              </td>
+            </tr>
+          ))}</tbody>
+        </table>
+      </section>
+    </>
+  );
+}
+
+function Shell({ yo: yoInicial, salir }: { yo: Yo; salir: () => void }) {
+  const [yo, setYo] = useState<Yo>(yoInicial);
+  const [vistaGlobal, setVistaGlobal] = useState<'' | 'usuarios' | 'password'>(yoInicial.debe_cambiar ? 'password' : '');
   const [periodos, setPeriodos] = useState<any[]>([]);
   const [periodoId, setPeriodoId] = useState('');
   const [locales, setLocales] = useState<any[]>([]);
@@ -54,12 +137,16 @@ function Shell({ yo, salir }: { yo: Yo; salir: () => void }) {
         <span className="sep" />
         {periodos.length > 1 && <select value={periodoId} onChange={e => setPeriodoId(e.target.value)}>{periodos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>}
         {periodo && <select value={hasta} onChange={e => setHasta(e.target.value)} aria-label="Corte">{periodo.meses.map((m: string) => <option key={m} value={m}>hasta {nombreMes(m)}</option>)}<option value="">trimestre completo</option></select>}
-        <span>{yo.nombre}</span>
-        <button onClick={salir}>Salir</button>
+        <span title={yo.email}>{yo.nombre}</span>
+        {yo.rol === 'DIRECCION' && <button onClick={() => { setLocalId(''); setVistaGlobal(vistaGlobal === 'usuarios' ? '' : 'usuarios'); }}>{vistaGlobal === 'usuarios' ? 'Locales' : 'Usuarios'}</button>}
+        <button onClick={() => setVistaGlobal('password')}>Contraseña</button>
+        <button onClick={async () => { try { await post('logout', {}); } catch { /* da igual */ } salir(); }}>Salir</button>
       </header>
       <main className="contenido">
-        {periodo && yo.rol === 'DIRECCION' && !localId && <><Resumen periodoId={periodoId} hasta={hasta} onLocal={setLocalId} /><EstadoCarga periodoId={periodoId} onLocal={setLocalId} /></>}
-        {periodo && localId && <Local yo={yo} localId={localId} periodo={periodo} hasta={hasta} modelo={modelo} catalogo={catalogo} locales={locales} volver={yo.rol === 'DIRECCION' ? () => setLocalId('') : undefined} />}
+        {vistaGlobal === 'password' && <CambiarPassword yo={yo} obligatorio={!!yo.debe_cambiar} onHecho={() => { setYo({ ...yo, debe_cambiar: false }); setVistaGlobal(''); }} />}
+        {vistaGlobal === 'usuarios' && yo.rol === 'DIRECCION' && <Usuarios locales={locales} yo={yo} />}
+        {vistaGlobal === '' && periodo && yo.rol === 'DIRECCION' && !localId && <><Resumen periodoId={periodoId} hasta={hasta} onLocal={setLocalId} /><EstadoCarga periodoId={periodoId} onLocal={setLocalId} /></>}
+        {vistaGlobal === '' && periodo && localId && <Local yo={yo} localId={localId} periodo={periodo} hasta={hasta} modelo={modelo} catalogo={catalogo} locales={locales} volver={yo.rol === 'DIRECCION' ? () => setLocalId('') : undefined} />}
       </main>
     </>
   );

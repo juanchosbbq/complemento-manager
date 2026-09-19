@@ -8,10 +8,13 @@ import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, extname } from 'node:path';
 import { abrir } from '../data/db';
 import * as repo from '../data/repo';
+import * as auth from '../data/auth';
 import { KPIS, MOTIVO_NEUTRALIZACION_TEXTO, PESOS_BLOQUE } from '../engine/modelo';
 import { importarCsvUber } from './integraciones/ubereats';
 
 const db = abrir();
+auth.limpiarSesionesCaducadas(db);
+setInterval(() => auth.limpiarSesionesCaducadas(db), 6 * 3600 * 1000).unref();
 const PUERTO = Number(process.env.PORT ?? 8787);
 const DIST = new URL('../ui/dist', import.meta.url).pathname;
 
@@ -29,12 +32,22 @@ const autor = (c: Ctx) => c.acceso?.nombre ?? 'desconocido';
 function api(c: Ctx): any {
   const [r0, r1, r2, r3] = c.ruta;
   if (r0 === 'login' && c.metodo === 'POST') {
-    const a = repo.acceso(db, String(c.body?.token ?? ''));
-    if (!a) throw new HttpError(401, 'Código de acceso no válido');
-    return { rol: a.rol, local_id: a.local_id, nombre: a.nombre };
+    try { return auth.iniciarSesion(db, String(c.body?.email ?? ''), String(c.body?.password ?? '')); }
+    catch (e: any) { throw new HttpError(401, e.message); }
   }
-  if (!c.acceso) throw new HttpError(401, 'Sin acceso');
-  if (r0 === 'yo') return { rol: c.acceso.rol, local_id: c.acceso.local_id, nombre: c.acceso.nombre };
+  if (!c.acceso) throw new HttpError(401, 'Sesión no válida o caducada');
+  if (r0 === 'yo') return { rol: c.acceso.rol, local_id: c.acceso.local_id, nombre: c.acceso.nombre, email: c.acceso.email, debe_cambiar: c.acceso.debe_cambiar };
+  if (r0 === 'logout' && c.metodo === 'POST') { auth.cerrarSesion(db, c.acceso.token); return { ok: true }; }
+  if (r0 === 'mi-password' && c.metodo === 'POST') { auth.cambiarMiPassword(db, c.acceso.email, String(c.body?.actual ?? ''), String(c.body?.nueva ?? ''), c.acceso.token); return { ok: true }; }
+  if (r0 === 'usuarios') {
+    requiereDireccion(c);
+    const b = c.body ?? {};
+    if (c.metodo === 'GET') return auth.usuarios(db);
+    if (c.metodo === 'POST' && !r1) { auth.crearUsuario(db, b, c.acceso.email); return { ok: true }; }
+    if (c.metodo === 'POST' && r1 && r2 === 'password') { auth.restablecerPassword(db, decodeURIComponent(r1), String(b.password ?? '')); return { ok: true }; }
+    if (c.metodo === 'POST' && r1) { auth.actualizarUsuario(db, decodeURIComponent(r1), b, c.acceso.email); return { ok: true }; }
+    if (c.metodo === 'DELETE' && r1) { auth.borrarUsuario(db, decodeURIComponent(r1), c.acceso.email); return { ok: true }; }
+  }
   if (r0 === 'modelo') return { kpis: KPIS, pesosBloque: PESOS_BLOQUE, motivos: MOTIVO_NEUTRALIZACION_TEXTO };
   if (r0 === 'locales') {
     const ls: Row[] = repo.locales(db).map(l => ({ ...l, manager: repo.managerDeLocal(db, l.id)?.nombre ?? null }));
@@ -116,7 +129,7 @@ const server = http.createServer(async (req, res) => {
       const chunks: Buffer[] = []; for await (const ch of req) chunks.push(ch as Buffer);
       const txt = Buffer.concat(chunks).toString('utf8'); body = txt ? JSON.parse(txt) : null;
     }
-    const token = req.headers['x-token']; const acc = token ? repo.acceso(db, String(token)) : null;
+    const token = req.headers['x-token']; const acc = token ? auth.sesion(db, String(token)) : null;
     try {
       const out = api({ metodo: req.method ?? 'GET', ruta: url.pathname.slice(5).split('/').filter(Boolean).map(decodeURIComponent), query: url.searchParams, body, acceso: acc });
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(out));

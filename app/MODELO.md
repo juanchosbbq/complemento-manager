@@ -107,3 +107,14 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 ## Inconsistencia detectada en v7
 
 §2.4 dice que solo los KPIs C se neutralizan, pero §6 (parada justificada, KPI 9), §12 (cambio de métrica) y §16 (no comunicado a T−15) neutralizan otros. Hay que reescribir §2.4 como «neutralización por causa tasada» con las cuatro causas.
+
+## v6.0 (18-sep-2026) — acceso con correo y contraseña
+
+- Sustituye los códigos compartidos por **usuarios individuales** (correo + contraseña) gestionados por Dirección desde la app: alta con rol (Dirección o Manager) y local, edición, restablecimiento de contraseña, retirada o reactivación del acceso, y borrado.
+- Contraseñas con **scrypt y sal por usuario** (node:crypto, sin dependencias); nunca en claro. Mínimo 10 caracteres con letras y números.
+- **Sesiones** con token aleatorio de 32 bytes y caducidad de 30 días. Retirar el acceso o restablecer la contraseña cierra las sesiones abiertas de ese usuario; cambiar la propia contraseña cierra las demás sesiones y conserva la actual.
+- **Bloqueo** de 15 minutos tras 5 intentos fallidos por correo.
+- **Salvaguardas**: no se puede borrar el propio usuario ni dejar el sistema sin ningún administrador activo.
+- **Primer administrador**: `juancho@equipojuanchos.com`, creado en el primer arranque sin usuarios, con `ADMIN_PASSWORD` de las variables del servicio (o una generada e impresa una vez en el log). Se obliga a cambiarla al entrar.
+- Lo que sigue sin estar: recuperación de contraseña por correo (hoy la restablece Dirección) y doble factor. Para el tamaño del piloto es suficiente; si la app crece, es lo siguiente.
+- Sigue dependiendo de **HTTPS** para que la contraseña no viaje en claro: el dominio `managers.equipojuanchos.com` lo da; la URL `*.up.railway.app` también.

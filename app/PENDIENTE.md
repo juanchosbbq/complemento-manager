@@ -9,7 +9,7 @@
 4. **Normalizar la hoja A de sala.** La lista actual ya incluye lo pedido el 18-sep (música, WiFi, LEDs murales, iluminación separada, bloque de barra), pero está pendiente de normalizar del todo con operaciones. Catálogo definitivo de las hojas A y B.
 4b. **Antiguo pendiente del catálogo:** Las 8+8 líneas sembradas son los elementos tipo del §7.1. Sustituir por las hojas definitivas (tabla `lineas_catalogo`); la hoja de visita usa el mismo catálogo.
 5. **Productos estratégicos** por local (máx. 3 SKUs) y cómo se extrae la penetración de Revo.
-6. **Códigos de acceso.** Cambiar los sembrados (`accesos`) y decidir dónde se despliega (portátil de dirección, VPS). Sin HTTPS no debe salir de la red interna.
+6. ~~Códigos de acceso~~ Resuelto en v6.0: usuarios con correo y contraseña. **Pendiente:** definir `ADMIN_PASSWORD` en las variables del servicio en Railway antes del primer arranque con la v6.0 (si no, la contraseña inicial saldrá en el log), y dar de alta a los tres Managers desde Usuarios.
 
 ## Antes del cierre de Q4 (T+15, mediados de enero)
 
