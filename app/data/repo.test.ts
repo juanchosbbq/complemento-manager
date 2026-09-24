@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { abrir } from './db';
-import { calcular, calcularProrrateo, config, datosPeriodo, guardarChecklist, guardarConfig, guardarNiveles, guardarVisita, hallazgosAbiertos, semanaISO } from './repo';
+import { calcular, calcularProrrateo, config, datosBrutos, datosPeriodo, guardarChecklist, guardarConfig, guardarMes, guardarNiveles, guardarVisita, hallazgosAbiertos, rangoCorte, semanaISO } from './repo';
 import { importarCsvUber } from '../server/integraciones/ubereats';
 
 function dbPrueba() {
@@ -112,5 +112,34 @@ describe('Cierre de hallazgos en visitas posteriores', () => {
     expect(rows[1]).toMatchObject({ cerrado_en_siguiente: 0, cerrado_fecha: '2026-10-19' });
     expect(hallazgosAbiertos(db, 'L1', 'Q4-2026').length).toBe(0);
     expect(calcular(db, 'L1', 'Q4-2026').agregados.valores.K11_HALLAZGOS.valor).toBe(50);
+  });
+});
+
+describe('Vistas por mes y checklist de Dirección', () => {
+  it('rangoCorte: meses aislados, M1+M2 y trimestre', () => {
+    const m = ['2026-10', '2026-11', '2026-12'];
+    expect(rangoCorte(m, 'M2')).toEqual({ desde: '2026-11', hasta: '2026-11' });
+    expect(rangoCorte(m, 'M1+M2')).toEqual({ desde: '2026-10', hasta: '2026-11' });
+    expect(rangoCorte(m, 'T')).toEqual({});
+  });
+  it('Mes 2 solo cuenta noviembre: octubre queda fuera y el objetivo se prorratea a un mes', () => {
+    const db = dbPrueba();
+    guardarNiveles(db, 'L1', 'Q4-2026', [{ kpi: 'K1_FACTURACION', umbral: 150, llave: 270, objetivo: 300, excelencia: 330 }], 'test');
+    guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 999 }, 'test');
+    guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-11', facturacion_real: 100 }, 'test');
+    const k1 = (c: any) => c.resultado.kpis.find((k: any) => k.id === 'K1_FACTURACION');
+    const m2 = calcular(db, 'L1', 'Q4-2026', 'M2');
+    expect(k1(m2).valor).toBe(100);
+    expect(k1(m2).niveles.objetivo).toBeCloseTo(100, 6); // 300 / 3 meses
+    expect(k1(calcular(db, 'L1', 'Q4-2026', 'M1+M2')).valor).toBe(1099);
+  });
+  it('el checklist de Dirección se guarda aparte y no toca el KPI 10', () => {
+    const db = dbPrueba();
+    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }]);
+    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Dirección', null, [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: false }], 'DIRECCION');
+    const d = datosBrutos(db, 'L1', 'Q4-2026');
+    expect(d.checklists.length).toBe(1);
+    expect(d.checklistsDireccion.length).toBe(1);
+    expect(calcular(db, 'L1', 'Q4-2026', 'T').agregados.aux.fiabilidadA).toBe(100);
   });
 });

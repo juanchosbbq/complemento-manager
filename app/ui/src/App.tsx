@@ -124,9 +124,10 @@ function Shell({ yo: yoInicial, salir }: { yo: Yo; salir: () => void }) {
     Promise.all([api('periodos'), api('locales'), api('modelo'), api('catalogo')]).then(([p, l, m, c]) => {
       setPeriodos(p); setLocales(l); setModelo(m); setCatalogo(c);
       const per = p[0]; setPeriodoId(per?.id ?? '');
+      // Por defecto, el mes en curso aislado; fuera del trimestre, el trimestre entero.
       const hoy = new Date().toISOString().slice(0, 7);
-      const mesesP: string[] = per?.meses ?? [];
-      setHasta(mesesP.includes(hoy) ? hoy : (hoy < mesesP[0] ? mesesP[0] : ''));
+      const i = (per?.meses ?? []).indexOf(hoy);
+      setHasta(i >= 0 ? `M${i + 1}` : 'T');
     });
   }, []);
   const periodo = periodos.find(p => p.id === periodoId);
@@ -136,7 +137,7 @@ function Shell({ yo: yoInicial, salir }: { yo: Yo; salir: () => void }) {
         <span className="marca">Juancho's <b>BBQ</b> · Complemento de Manager</span>
         <span className="sep" />
         {periodos.length > 1 && <select value={periodoId} onChange={e => setPeriodoId(e.target.value)}>{periodos.map(p => <option key={p.id} value={p.id}>{p.nombre}</option>)}</select>}
-        {periodo && <select value={hasta} onChange={e => setHasta(e.target.value)} aria-label="Corte">{periodo.meses.map((m: string) => <option key={m} value={m}>hasta {nombreMes(m)}</option>)}<option value="">trimestre completo</option></select>}
+        {periodo && <select value={hasta} onChange={e => setHasta(e.target.value)} aria-label="Vista">{cortes(periodo).map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select>}
         <span title={yo.email}>{yo.nombre}</span>
         {yo.rol === 'DIRECCION' && <button onClick={() => { setLocalId(''); setVistaGlobal(vistaGlobal === 'usuarios' ? '' : 'usuarios'); }}>{vistaGlobal === 'usuarios' ? 'Locales' : 'Usuarios'}</button>}
         <button onClick={() => setVistaGlobal('password')}>Contraseña</button>
@@ -181,14 +182,22 @@ function IconoBloque({ bloque, nombre, logro, semaforo, esLlave }: { bloque: str
   );
 }
 
+/** Vistas: cada mes aislado, los dos primeros acumulados y el trimestre. */
+export function cortes(periodo: any): [string, string][] {
+  const m: string[] = periodo?.meses ?? [];
+  const n = (i: number) => (m[i] ? ` (${nombreMes(m[i])})` : '');
+  return [['M1', `Mes 1${n(0)}`], ['M2', `Mes 2${n(1)}`], ['M3', `Mes 3${n(2)}`], ['M1+M2', 'M1 + M2'], ['T', 'Trimestre']];
+}
+const textoCorte = (periodo: any, c: string) => cortes(periodo).find(([v]) => v === c)?.[1] ?? 'Trimestre';
+
 function Resumen({ periodoId, hasta, onLocal }: { periodoId: string; hasta: string; onLocal: (id: string) => void }) {
   const [filas, setFilas] = useState<any[] | null>(null);
-  useEffect(() => { setFilas(null); api(`resumen/${periodoId}${hasta ? '?hasta=' + hasta : ''}`).then(setFilas); }, [periodoId, hasta]);
+  useEffect(() => { setFilas(null); api(`resumen/${periodoId}?corte=${hasta || 'T'}`).then(setFilas); }, [periodoId, hasta]);
   if (!filas) return <p className="muted">Calculando…</p>;
   const total = filas.filter(f => f.ok).reduce((s, f) => s + f.pago, 0);
   return (
     <>
-      <h1>Los locales del modelo{hasta ? ` · acumulado hasta ${nombreMes(hasta)}` : ' · trimestre completo'}</h1>
+      <h1>Los locales del modelo · {({ M1: 'mes 1', M2: 'mes 2', M3: 'mes 3', 'M1+M2': 'meses 1 y 2', T: 'trimestre' } as Record<string, string>)[hasta || 'T']}</h1>
       <p className="muted">Un icono por bloque: euro (ventas), estrella (atención), bolsa (operaciones) y llave inglesa (mantenimiento) son las cuatro llaves — rojo es una llave rota hoy, ámbar cumple sin margen. El quinto, en azul, es Dirección con su nota: puntúa, pero no es llave. Pulsa un local para ver el desglose y cargar datos.</p>
       <section className="panel">
         <table className="resumen-locales">
@@ -247,11 +256,11 @@ function Local({ yo, localId, periodo, hasta, modelo, catalogo, locales, volver 
   const [calc, setCalc] = useState<any>(null);
   const [datos, setDatos] = useState<any>(null);
   const [err, setErr] = useState('');
-  const [vista, setVista] = useState<'seguimiento' | 'checklist' | 'datos' | 'cierre'>('seguimiento');
+  const [vista, setVista] = useState<'seguimiento' | 'checklist' | 'checklist-dir' | 'datos' | 'cierre'>('seguimiento');
   const local = locales.find(l => l.id === localId);
   const cargar = useCallback(() => {
     setErr('');
-    api(`calculo/${localId}/${periodo.id}${hasta ? '?hasta=' + hasta : ''}`).then(setCalc).catch(e => { setCalc(null); setErr(e.message); });
+    api(`calculo/${localId}/${periodo.id}?corte=${hasta || 'T'}`).then(setCalc).catch(e => { setCalc(null); setErr(e.message); });
     api(`datos/${localId}/${periodo.id}`).then(setDatos).catch(() => setDatos(null));
   }, [localId, periodo.id, hasta]);
   useEffect(cargar, [cargar]);
@@ -261,23 +270,20 @@ function Local({ yo, localId, periodo, hasta, modelo, catalogo, locales, volver 
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 14, flexWrap: 'wrap' }}>
         {volver && <button className="btn sec peq" onClick={volver}>← Todos los locales</button>}
         <h1>{local?.nombre ?? localId}{local?.manager ? <span className="muted"> · {local.manager}</span> : null}</h1>
-        <span className="muted">{periodo.nombre}{hasta ? ` · hasta ${nombreMes(hasta)}` : ' · trimestre completo'}</span>
+        <span className="muted">{periodo.nombre} · {textoCorte(periodo, hasta || 'T')}</span>
       </div>
       <div className="pestanas">
         <button className={vista === 'seguimiento' ? 'activa' : ''} onClick={() => setVista('seguimiento')}>Seguimiento</button>
         <button className={vista === 'checklist' ? 'activa' : ''} onClick={() => setVista('checklist')}>Checklist semanal</button>
+        {yo.rol === 'DIRECCION' && <button className={vista === 'checklist-dir' ? 'activa' : ''} onClick={() => setVista('checklist-dir')}>Checklist Dirección</button>}
         {yo.rol === 'DIRECCION' && <button className={vista === 'datos' ? 'activa' : ''} onClick={() => setVista('datos')}>Cargar datos y configurar</button>}
         {yo.rol === 'DIRECCION' && <button className={vista === 'cierre' ? 'activa' : ''} onClick={() => setVista('cierre')}>Cierre del trimestre</button>}
       </div>
       {ilustrativo && <div className="aviso">Este local tiene datos o umbrales marcados como ilustrativos (sembrado de ejemplo). No son cifras de la empresa: sustitúyelos por los de la carta de objetivos y los reales.</div>}
       {err && <div className="error">{err}{yo.rol === 'DIRECCION' && ' — completa la configuración en «Cargar datos y configurar».'}</div>}
       {vista === 'seguimiento' && calc && <Detalle calc={calc} modelo={modelo} rol={yo.rol} />}
-      {vista === 'checklist' && datos && <Checklist localId={localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
-      {vista === 'checklist' && datos && datos.checklists.length > 0 && (
-        <section className="panel"><h3>Semanas registradas</h3><table><thead><tr><th>Semana</th><th>Hoja</th><th>Firmas</th><th className="n">No conformes</th><th className="n">Sin aviso</th></tr></thead><tbody>
-          {datos.checklists.map((s: any) => <tr key={s.id}><td>{s.semana}</td><td>{s.hoja}</td><td>{s.firma_manager}{s.firma_jefe_cocina ? ' · ' + s.firma_jefe_cocina : ''}</td><td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME').length}</td><td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME' && !l.aviso_en_24h).length}</td></tr>)}
-        </tbody></table></section>
-      )}
+      {vista === 'checklist' && datos && <Checklist key="m" localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
+      {vista === 'checklist-dir' && datos && yo.rol === 'DIRECCION' && <Checklist key="d" tipo="DIRECCION" localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklistsDireccion ?? []} nombre={yo.nombre} onGuardado={cargar} />}
       {vista === 'datos' && datos && yo.rol === 'DIRECCION' && <Entrada localId={localId} periodoId={periodo.id} meses={periodo.meses} datos={datos} modelo={modelo} catalogo={catalogo} nombre={yo.nombre} onCambio={cargar} />}
       {vista === 'cierre' && datos && yo.rol === 'DIRECCION' && <Cierre localId={localId} periodoId={periodo.id} datos={datos} onCambio={cargar} />}
     </>

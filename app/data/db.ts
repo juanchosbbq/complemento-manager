@@ -74,6 +74,19 @@ CREATE TABLE IF NOT EXISTS checklist_lineas (
   aviso_en_24h INTEGER NOT NULL DEFAULT 0, observacion TEXT,
   PRIMARY KEY (semana_id, linea_id)
 );
+-- Checklist de Dirección: misma estructura, registro aparte. No alimenta ningún KPI.
+CREATE TABLE IF NOT EXISTS checklist_dir_semanas (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, local_id TEXT NOT NULL, periodo_id TEXT NOT NULL,
+  semana TEXT NOT NULL, hoja TEXT NOT NULL CHECK (hoja IN ('A','B')),
+  firma_manager TEXT, firma_jefe_cocina TEXT, ts TEXT NOT NULL,
+  UNIQUE (local_id, periodo_id, semana, hoja)
+);
+CREATE TABLE IF NOT EXISTS checklist_dir_lineas (
+  semana_id INTEGER NOT NULL REFERENCES checklist_dir_semanas(id) ON DELETE CASCADE,
+  linea_id TEXT NOT NULL, estado TEXT NOT NULL CHECK (estado IN ('CONFORME','NO_CONFORME')),
+  aviso_en_24h INTEGER NOT NULL DEFAULT 0, observacion TEXT,
+  PRIMARY KEY (semana_id, linea_id)
+);
 CREATE TABLE IF NOT EXISTS lineas_catalogo (
   hoja TEXT NOT NULL, linea_id TEXT NOT NULL, texto TEXT NOT NULL, orden INTEGER NOT NULL,
   PRIMARY KEY (hoja, linea_id)

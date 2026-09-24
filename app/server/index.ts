@@ -59,18 +59,18 @@ function api(c: Ctx): any {
 
   if (r0 === 'resumen' && r1) {
     requiereDireccion(c);
-    const hasta = c.query.get('hasta') ?? undefined;
+    const hasta = (c.query.get('corte') ?? c.query.get('hasta')) ?? undefined;
     return repo.locales(db).map(l => {
       try { const x = repo.calcular(db, l.id, r1, hasta); return { local: l, ok: true, bloques: x.resultado.bloques, logro: x.resultado.logroPonderado, llaves: x.resultado.llavesCumplidas, pago: x.resultado.pago, puertas: x.resultado.puertas.superadas, avisos: x.avisos, manager: repo.managerDeLocal(db, l.id)?.nombre ?? null }; }
       catch (e: any) { return { local: l, ok: false, error: e.message, manager: repo.managerDeLocal(db, l.id)?.nombre ?? null }; }
     });
   }
-  if (r0 === 'calculo' && r1 && r2) { requiereLocal(c, r1); return repo.calcular(db, r1, r2, c.query.get('hasta') ?? undefined); }
+  if (r0 === 'calculo' && r1 && r2) { requiereLocal(c, r1); return repo.calcular(db, r1, r2, (c.query.get('corte') ?? c.query.get('hasta')) ?? undefined); }
   if (r0 === 'datos' && r1 && r2) {
     requiereLocal(c, r1);
     const d = repo.datosBrutos(db, r1, r2);
-    if (c.acceso.rol === 'MANAGER') { delete (d as any).cualitativa; }
-    return { ...d, configuracion: repo.configCruda(db, r1, r2) };
+    if (c.acceso.rol === 'MANAGER') { delete (d as any).cualitativa; delete (d as any).checklistsDireccion; }
+    return { ...d, configuracion: { ...repo.configCruda(db, r1, r2), localNombre: repo.local(db, r1)?.nombre ?? r1 } };
   }
 
   // Escrituras del Manager: checklist de su local
@@ -80,6 +80,12 @@ function api(c: Ctx): any {
     if (c.metodo === 'DELETE') { repo.borrarChecklist(db, r1, r2, b.semana, b.hoja, autor(c)); return { ok: true }; }
     const id = repo.guardarChecklist(db, r1, r2, b.semana, b.hoja, b.firma_manager ?? null, b.firma_jefe_cocina ?? null, b.lineas ?? []);
     return { ok: true, id };
+  }
+  if (r0 === 'checklist-dir' && r1 && r2 && (c.metodo === 'POST' || c.metodo === 'DELETE')) {
+    requiereDireccion(c);
+    const b = c.body ?? {};
+    if (c.metodo === 'DELETE') { repo.borrarChecklist(db, r1, r2, b.semana, b.hoja, autor(c), 'DIRECCION'); return { ok: true }; }
+    return { ok: true, id: repo.guardarChecklist(db, r1, r2, b.semana, b.hoja, b.firma_manager ?? null, null, b.lineas ?? [], 'DIRECCION') };
   }
 
   requiereDireccion(c);

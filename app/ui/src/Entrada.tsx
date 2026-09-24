@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { api, nombreMes, post } from './api';
+import { compartirDrive, descargarPdf, docVisita } from './pdf';
 
 type Props = { localId: string; periodoId: string; meses: string[]; datos: any; modelo: any; catalogo: any[]; nombre: string; onCambio: () => void };
 
@@ -18,7 +19,7 @@ const n = (v: string) => (v === '' ? null : Number(v));
 
 export function Entrada(p: Props) {
   const [tab, setTab] = useState('ventas');
-  const tabs: [string, string][] = [['ventas', 'Ventas y reseñas'], ['uber', 'Uber Eats'], ['visita', 'Visita de dirección'], ['ficha', 'Cliente misterioso'], ['direccion', 'Dirección'], ['puertas', 'Puertas y situaciones especiales'], ['config', 'Configuración']];
+  const tabs: [string, string][] = [['ventas', 'Ventas y reseñas'], ['uber', 'Uber Eats'], ['visita', 'Hallazgos Visitas'], ['ficha', 'Cliente misterioso'], ['direccion', 'Dirección'], ['puertas', 'Puertas y situaciones especiales'], ['config', 'Configuración']];
   return (
     <>
       <div className="pestanas">{tabs.map(([k, t]) => <button key={k} className={tab === k ? 'activa' : ''} onClick={() => setTab(k)}>{t}</button>)}</div>
@@ -100,6 +101,7 @@ function Uber({ localId, periodoId, meses, datos, onCambio }: Props) {
 }
 
 function Visita({ localId, periodoId, datos, catalogo, nombre, onCambio }: Props) {
+  const nombreLocal = datos.configuracion?.localNombre ?? localId;
   const { enviar, Msg } = useEnvio(onCambio);
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [visitante, setVisitante] = useState(nombre);
@@ -110,7 +112,7 @@ function Visita({ localId, periodoId, datos, catalogo, nombre, onCambio }: Props
   const texto = (h: any) => catalogo.find(c => c.linea_id === h.linea_id)?.texto ?? h.linea_id;
   return (
     <section className="panel">
-      <h2>Visita de dirección</h2>
+      <h2>Hallazgos Visitas</h2>
       <p className="small muted">Misma taxonomía que el checklist. Un solo juicio por hallazgo: ¿debió detectarse en el último checklist? Lo que el Manager ya había reportado no penaliza nunca. Para el KPI 11 solo cuenta si se cierra en la visita inmediatamente siguiente; cerrarlo más tarde queda registrado, pero ya no puntúa.</p>
       <div className="form">
         <label>Fecha<input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></label>
@@ -148,6 +150,8 @@ function Visita({ localId, periodoId, datos, catalogo, nombre, onCambio }: Props
       {datos.visitas.length > 0 && <table style={{ marginTop: 14 }}><thead><tr><th>Fecha</th><th>Visitante</th><th>Notas</th><th>Hallazgos</th><th></th></tr></thead><tbody>{[...datos.visitas].reverse().map((v: any) => <tr key={v.id}><td>{v.fecha}</td><td>{v.visitante}</td><td className="small">{v.notas || <span className="muted">—</span>}</td><td>{v.hallazgos.length === 0 ? <span className="muted">ninguno</span> : v.hallazgos.map((h: any) => <div key={h.id} className="small">{texto(h)}{h.descripcion ? ` — ${h.descripcion}` : ''}{h.reportado_previamente ? ' · reportado' : ''}{!h.debio_detectarse ? ' · posterior al checklist' : ''}{h.archivado ? ' · archivado' : h.cerrado_fecha ? ` · cerrado el ${h.cerrado_fecha}${h.cerrado_en_siguiente === 1 ? ' (en la visita siguiente)' : ''}` : ' · abierto'}</div>)}</td>
         <td style={{ whiteSpace: 'nowrap' }}>
           <button className="btn sec peq" onClick={() => { const fe = prompt('Fecha (AAAA-MM-DD)', v.fecha); if (!fe) return; const vi = prompt('Visitante', v.visitante) ?? v.visitante; const no = prompt('Notas', v.notas ?? '') ?? v.notas; enviar(`visita/${localId}/${periodoId}/${v.id}`, { fecha: fe, visitante: vi, notas: no }, 'Visita actualizada.'); }}>Editar</button>{' '}
+          <button className="btn sec peq" onClick={() => descargarPdf(docVisita(v, catalogo, nombreLocal))}>PDF</button>{' '}
+          <button className="btn sec peq" onClick={() => compartirDrive(docVisita(v, catalogo, nombreLocal))}>Drive</button>{' '}
           <button className="btn sec peq" onClick={() => { if (confirm(`¿Borrar la visita del ${v.fecha} y sus ${v.hallazgos.length} hallazgo(s)?`)) enviar(`visita/${localId}/${periodoId}/${v.id}`, {}, 'Visita borrada.', 'DELETE'); }}>Borrar</button>
         </td></tr>)}</tbody></table>}
     </section>

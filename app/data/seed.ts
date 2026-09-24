@@ -71,7 +71,9 @@ function sincronizarCatalogo() {
 
 function asegurarAdmin() {
   const a = asegurarAdminInicial(db);
-  if (a) console.log(a.generada
+  if (!a) return;
+  if (a.forzada) console.log(`\n>>> RESET_ADMIN_PASSWORD activo: contraseña de ${a.email} forzada a la de esa variable. Quítala de Railway en cuanto entres.\n`);
+  else console.log(a.generada
     ? `\n>>> PRIMER ADMINISTRADOR creado: ${a.email}\n>>> Contraseña temporal (solo se muestra esta vez, cámbiala al entrar): ${a.password}\n`
     : `Primer administrador creado: ${a.email} (contraseña de ADMIN_PASSWORD; se pedirá cambiarla al entrar).`);
 }

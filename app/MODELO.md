@@ -118,3 +118,15 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Primer administrador**: `juancho@equipojuanchos.com`, creado en el primer arranque sin usuarios, con `ADMIN_PASSWORD` de las variables del servicio (o una generada e impresa una vez en el log). Se obliga a cambiarla al entrar.
 - Lo que sigue sin estar: recuperación de contraseña por correo (hoy la restablece Dirección) y doble factor. Para el tamaño del piloto es suficiente; si la app crece, es lo siguiente.
 - Sigue dependiendo de **HTTPS** para que la contraseña no viaje en claro: el dominio `managers.equipojuanchos.com` lo da; la URL `*.up.railway.app` también.
+
+## v6.1 (19-sep-2026)
+
+- **Vistas**: Mes 1, Mes 2 y Mes 3 aislados (el objetivo del trimestre prorrateado a ese mes), M1 + M2 acumulado y Trimestre. Por defecto se abre el mes en curso. La tendencia muestra cada mes aislado. El cierre calcula siempre el trimestre de forma definitiva.
+- **Tabla de KPIs**: columnas 50% · 90% · **100%** · 120% con los valores de la carta (la columna 90% es la llave calibrada, no el 90% aritmético del objetivo). Valores largos comprimidos (40.395 € → 40,4K€).
+- **Color del logro por tramo**: por debajo del umbral rojo, umbral–llave naranja, llave–objetivo amarillo, objetivo–excelencia verde, excelencia (120%) azul oscuro. Las tarjetas de bloque conservan el semáforo de llave.
+- **Imprimir** saca todas las áreas, no solo la abierta.
+- **Checklist de Dirección**: pestaña propia para Dirección, mismas líneas, registro aparte. No alimenta ningún KPI y el Manager no lo ve.
+- **Histórico de checklists** (Manager y Dirección) con editar, borrar, PDF y Drive. **Hallazgos Visitas** (antes "Visita de dirección") con PDF y Drive por visita.
+- **Drive**: "compartir con Drive" con la cuenta de cada usuario — en móvil abre la hoja de compartir del sistema; en escritorio descarga el PDF y abre Drive en otra pestaña. Sin cuenta de servicio ni credenciales en el servidor.
+- **Móvil**: desplegables del checklist alineados a la derecha con ancho fijo, cabecera que se reordena, pestañas con desplazamiento lateral, y casillas de puertas delante de su texto.
+- **Rescate del administrador**: `RESET_ADMIN_PASSWORD` en Railway fuerza esa contraseña en `juancho@equipojuanchos.com` en cada arranque; quitarla en cuanto se entre.

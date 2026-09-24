@@ -134,10 +134,29 @@ export const limpiarSesionesCaducadas = (db: DB) => run(db, 'DELETE FROM sesione
 
 const perfil = (u: Row) => ({ email: u.email, nombre: u.nombre, rol: u.rol as 'DIRECCION' | 'MANAGER', local_id: u.local_id ?? null, debe_cambiar: !!u.debe_cambiar });
 
-/** Crea el primer administrador si no hay ningún usuario. La contraseña sale de ADMIN_PASSWORD o, si no está, se genera y se imprime UNA vez. */
+/**
+ * Crea el primer administrador si no hay ningún usuario. La contraseña sale de ADMIN_PASSWORD o,
+ * si no está, se genera y se imprime UNA vez — solo aplica en el arranque que crea la base, no
+ * después: si ya existe un usuario, esta función no toca nada.
+ *
+ * RESET_ADMIN_PASSWORD es la vía de rescate: si está definida, en CADA arranque fuerza esa
+ * contraseña en el administrador (creándolo si hiciera falta), exista ya o no, y sea cual sea la
+ * que tuviera. Sirve para recuperar el acceso sin tocar la base de datos a mano; se recomienda
+ * quitar la variable de Railway en cuanto se haya vuelto a entrar.
+ */
 export function asegurarAdminInicial(db: DB, email = process.env.ADMIN_EMAIL ?? 'juancho@equipojuanchos.com') {
+  const reset = process.env.RESET_ADMIN_PASSWORD;
+  if (reset) {
+    if (get(db, 'SELECT 1 FROM usuarios WHERE email = ?', normalizar(email))) {
+      restablecerPassword(db, email, reset, true);
+      run(db, 'UPDATE usuarios SET rol = ?, local_id = NULL, activo = 1 WHERE email = ?', 'DIRECCION', normalizar(email));
+    } else {
+      crearUsuario(db, { email, nombre: 'Dirección', rol: 'DIRECCION', password: reset, debe_cambiar: true }, 'sistema');
+    }
+    return { email, password: reset, generada: false, forzada: true };
+  }
   if (hayUsuarios(db)) return null;
   const password = process.env.ADMIN_PASSWORD || randomBytes(9).toString('base64url') + 'a1';
   crearUsuario(db, { email, nombre: 'Dirección', rol: 'DIRECCION', password, debe_cambiar: true }, 'sistema');
-  return { email, password, generada: !process.env.ADMIN_PASSWORD };
+  return { email, password, generada: !process.env.ADMIN_PASSWORD, forzada: false };
 }

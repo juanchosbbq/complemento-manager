@@ -1,12 +1,21 @@
 import { useState } from 'react';
-import { eur, num } from './api';
+import { compacto, eur, num } from './api';
 
 const UNIDAD_EUR = ['K1_FACTURACION', 'K2_TICKET'];
+/** Valor en las unidades del KPI, comprimido si es largo (40.395 € → 40,4K€). */
+const fmt = (id: string, v: number | null | undefined) => compacto(v, UNIDAD_EUR.includes(id) ? '€' : '');
 function valorKpi(k: any) {
   if (k.valor === null) return '—';
   if (k.id === 'K9_DISPONIBILIDAD') return k.valor === 100 ? 'cumple' : 'no cumple';
-  if (UNIDAD_EUR.includes(k.id)) return eur(k.valor);
-  return num(k.valor, 2);
+  return fmt(k.id, k.valor);
+}
+/** Color del logro de un KPI según el tramo de la escala alcanzado. */
+export function tramo(logro: number): string {
+  if (logro >= 120) return 't-exc';
+  if (logro >= 100) return 't-obj';
+  if (logro >= 90) return 't-llave';
+  if (logro >= 50) return 't-umbral';
+  return 't-bajo';
 }
 
 const NOMBRE_BLOQUE: Record<string, string> = { VENTAS: 'Ventas', ATENCION: 'Atención al cliente', OPERACIONES: 'Operaciones de canal', MANTENIMIENTO: 'Mantenimiento', DIRECCION: 'Dirección' };
@@ -25,7 +34,7 @@ export function Detalle({ calc, modelo, rol }: { calc: any; modelo: any; rol: st
       {parcial && <p className="muted small">Acumulado a fecha: lo que llevas contra la parte del objetivo del trimestre que corresponde a estos meses. Los indicadores que todavía no tienen dato aparecen como pendientes y no cuentan en la nota hasta que se carguen.</p>}
 
       <div className="no-print" style={{ textAlign: 'right', marginBottom: 8 }}>
-        <button className="btn sec peq" onClick={() => window.print()}>Imprimir o guardar en PDF</button>
+        <button className="btn sec peq" onClick={() => window.print()}>Imprimir o guardar en PDF (todas las áreas)</button>
       </div>
       <section className="formula" aria-label="Cómo se calcula el complemento">
         <div className="term"><div className="v">{eur(r.importeObjetivo)}</div><div className="l">importe objetivo</div></div>
@@ -77,12 +86,12 @@ export function Detalle({ calc, modelo, rol }: { calc: any; modelo: any; rol: st
         </section>
       )}
 
-      {r.bloques.filter((b: any) => b.bloque === abierto).map((b: any) => (
-        <section className="panel" key={b.bloque}>
+      {r.bloques.map((b: any) => (
+        <section className={'panel bloque-detalle' + (b.bloque === abierto ? ' activo' : '')} key={b.bloque}>
           <h2>{NOMBRE_BLOQUE[b.bloque]}</h2>
           {b.notas.map((n: string, i: number) => <div className="aviso" key={i}>{n}</div>)}
           <table>
-            <thead><tr><th>Indicador</th><th className="n">Peso</th><th className="n">Valor</th><th>Umbral · objetivo · excelencia</th><th className="n">Logro</th><th className="n">Puntos</th></tr></thead>
+            <thead><tr><th>Indicador</th><th className="n">Peso</th><th className="n">Valor</th><th className="n niv">50%</th><th className="n niv">90%</th><th className="n niv obj">100%</th><th className="n niv">120%</th><th className="n">Logro</th><th className="n">Puntos</th></tr></thead>
             <tbody>
               {r.kpis.filter((k: any) => k.bloque === b.bloque).map((k: any) => {
                 const d = defs[k.id];
@@ -103,8 +112,15 @@ export function Detalle({ calc, modelo, rol }: { calc: any; modelo: any; rol: st
                     </td>
                     <td className="n">{num(k.pesoEfectivo, 2)}{k.pesoEfectivo !== k.pesoBase && <span className="small muted"> ({k.pesoBase})</span>}</td>
                     <td className="n">{pendiente ? <span className="muted">—</span> : valorKpi(k)}</td>
-                    <td className="small">{noComputa ? '—' : k.id === 'K9_DISPONIBILIDAD' ? <>binario{!pendiente && <Barra logro={k.logro} />}</> : <>{num(k.niveles.umbral, 2)} · {k.niveles.llave !== undefined && k.niveles.llave !== null ? `${num(k.niveles.llave, 2)} · ` : ''}{num(k.niveles.objetivo, 2)} · {num(k.niveles.excelencia, 2)}<Barra logro={k.logro} /></>}</td>
-                    <td className="n">{noComputa || pendiente ? '—' : `${num(k.logro)} %`}</td>
+                    {noComputa ? <td className="n niv muted" colSpan={4}>—</td>
+                      : k.id === 'K9_DISPONIBILIDAD' ? <><td className="n niv muted">—</td><td className="n niv muted">—</td><td className="n niv obj">100%</td><td className="n niv muted">—</td></>
+                      : <>
+                        <td className="n niv">{fmt(k.id, k.niveles.umbral)}</td>
+                        <td className="n niv">{k.niveles.llave !== undefined && k.niveles.llave !== null ? fmt(k.id, k.niveles.llave) : <span className="muted" title="Sin llave calibrada: se interpola entre 50% y 100%">—</span>}</td>
+                        <td className="n niv obj">{fmt(k.id, k.niveles.objetivo)}</td>
+                        <td className="n niv">{fmt(k.id, k.niveles.excelencia)}</td>
+                      </>}
+                    <td className="n">{noComputa || pendiente ? '—' : <span className={'logro-kpi ' + tramo(k.logro)}>{num(k.logro)} %</span>}</td>
                     <td className="n">{pendiente ? '—' : num(k.puntos, 2)}</td>
                   </tr>
                 );

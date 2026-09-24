@@ -13,3 +13,13 @@ export const eur = (n: number) => n.toLocaleString('es-ES', { style: 'currency',
 export const num = (n: number | null | undefined, d = 1) => (n === null || n === undefined ? '—' : n.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: 0 }));
 export const MESES: Record<string, string> = { '01': 'enero', '02': 'febrero', '03': 'marzo', '04': 'abril', '05': 'mayo', '06': 'junio', '07': 'julio', '08': 'agosto', '09': 'septiembre', '10': 'octubre', '11': 'noviembre', '12': 'diciembre' };
 export const nombreMes = (m: string) => MESES[m.slice(5, 7)] ?? m;
+
+/** Formato compacto para tablas estrechas: 40.395 € → 40,4K€; 1.250.000 € → 1,25M€. Por debajo de 10.000 se deja tal cual. */
+export function compacto(v: number | null | undefined, sufijo = ''): string {
+  if (v === null || v === undefined || Number.isNaN(v)) return '—';
+  const a = Math.abs(v);
+  const f = (x: number, d: number) => x.toLocaleString('es-ES', { maximumFractionDigits: d, minimumFractionDigits: 0 });
+  if (a >= 1e6) return `${f(v / 1e6, 2)}M${sufijo}`;
+  if (a >= 1e4) return `${f(v / 1e3, 1)}K${sufijo}`;
+  return `${f(v, 2)}${sufijo}`;
+}
