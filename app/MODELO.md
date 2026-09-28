@@ -130,3 +130,13 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Drive**: "compartir con Drive" con la cuenta de cada usuario — en móvil abre la hoja de compartir del sistema; en escritorio descarga el PDF y abre Drive en otra pestaña. Sin cuenta de servicio ni credenciales en el servidor.
 - **Móvil**: desplegables del checklist alineados a la derecha con ancho fijo, cabecera que se reordena, pestañas con desplazamiento lateral, y casillas de puertas delante de su texto.
 - **Rescate del administrador**: `RESET_ADMIN_PASSWORD` en Railway fuerza esa contraseña en `juancho@equipojuanchos.com` en cada arranque; quitarla en cuanto se entre.
+
+## v6.2 (28-sep-2026)
+
+- **Cartas de Local 1 y Local 2 precargadas** desde las hojas de Drive (`data/cartas.ts`): los 16 umbrales con su llave, importe, perfil MIXTO, suelo de nota de reseñas (4,0 y 4,4, igual al umbral de la nota) y producto estratégico de Local 1. Se aplican una sola vez en el primer arranque con esta versión; lo que se cambie después desde Configuración no se pisa en los siguientes despliegues.
+- Corrige de paso la llave del ticket medio de Local 1 (34,30 €, no 35,30 € como se había tecleado).
+
+## v6.3 (28-sep-2026)
+
+- **Local 3 = Las Tablas.** Carta precargada desde "Objetivos Q4 2026 - Las Tablas" con el mismo mecanismo de un solo uso. Suelo de nota de reseñas 4,4 (igual al umbral de la nota, misma suposición que en los otros dos). Sin producto estratégico nombrado.
+- Cartas de Local 1 y Local 2 verificadas de nuevo contra Drive el 28-sep: sin cambios.

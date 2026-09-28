@@ -7,6 +7,7 @@
 import { abrir } from './db';
 import * as repo from './repo';
 import { asegurarAdminInicial } from './auth';
+import { aplicarCartas } from './cartas';
 
 /**
  * Catálogo de checklist — hojas A (sala) y B (cocina). Pendiente de normalizar del todo con
@@ -79,15 +80,21 @@ function asegurarAdmin() {
 }
 
 const sinDatos = (db.prepare('SELECT COUNT(*) AS n FROM locales').get() as any).n === 0;
+function cartas() {
+  const a = aplicarCartas(db);
+  if (a.length) console.log(`Cartas de objetivos cargadas: ${a.join(', ')}`);
+}
+
 if (!sinDatos && !process.argv.includes('--forzar')) {
   sincronizarCatalogo();
   asegurarAdmin();
+  cartas();
   console.log('Resto de la base ya tenía datos: sin tocar. (Usa --forzar para resembrar todo lo demás desde cero — borra configuración y datos.)');
   process.exit(0);
 }
 db.exec(`DELETE FROM liquidaciones; DELETE FROM neutralizaciones; DELETE FROM puertas; DELETE FROM coste_personal_mes; DELETE FROM descuentos_mes; DELETE FROM cualitativa;
   DELETE FROM compromisos; DELETE FROM fichas_misterioso; DELETE FROM hallazgos; DELETE FROM visitas; DELETE FROM checklist_lineas; DELETE FROM checklist_semanas;
-  DELETE FROM uber_mes; DELETE FROM meses; DELETE FROM niveles; DELETE FROM config_periodo; DELETE FROM lineas_catalogo; DELETE FROM managers; DELETE FROM accesos; DELETE FROM sesiones; DELETE FROM usuarios; DELETE FROM periodos; DELETE FROM locales;`);
+  DELETE FROM uber_mes; DELETE FROM meses; DELETE FROM niveles; DELETE FROM config_periodo; DELETE FROM lineas_catalogo; DELETE FROM managers; DELETE FROM accesos; DELETE FROM sesiones; DELETE FROM usuarios; DROP TABLE IF EXISTS migraciones; DELETE FROM periodos; DELETE FROM locales;`);
 
 // ---- Maestros ----
 db.exec(`INSERT INTO locales (id, nombre, ciudad, en_modelo, en_piloto, orden) VALUES
@@ -144,4 +151,5 @@ if (process.argv.includes('--ejemplo')) {
   repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
 }
 
+cartas();
 console.log('Sembrado. Los usuarios se gestionan desde Dirección → Usuarios. Los umbrales se cargan desde la carta de cada local (Configuración).' + (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''));

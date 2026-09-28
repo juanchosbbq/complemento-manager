@@ -143,3 +143,21 @@ describe('Vistas por mes y checklist de Dirección', () => {
     expect(calcular(db, 'L1', 'Q4-2026', 'T').agregados.aux.fiabilidadA).toBe(100);
   });
 });
+
+describe('Cartas de objetivos precargadas', () => {
+  it('se aplican una sola vez y no pisan un cambio posterior hecho desde Configuración', async () => {
+    const { aplicarCartas } = await import('./cartas');
+    const db = dbPrueba();
+    db.exec("INSERT INTO locales VALUES ('L2','Local 2','Madrid',1,1,2), ('L3','Local 3','Madrid',1,1,3)");
+    expect(aplicarCartas(db).sort()).toEqual(['carta-q4-2026-L1', 'carta-q4-2026-L2', 'carta-q4-2026-L3']);
+    expect(config(db, 'L3', 'Q4-2026')!.niveles.K1_FACTURACION!.objetivo).toBe(138464.25);
+    const c1 = config(db, 'L1', 'Q4-2026')!;
+    expect(c1.niveles.K2_TICKET).toEqual({ umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 });
+    expect(c1.niveles.K9_DISPONIBILIDAD!.objetivo).toBe(100);
+    expect(config(db, 'L2', 'Q4-2026')!.niveles.K1_FACTURACION!.objetivo).toBe(214047.6);
+    expect(config(db, 'L2', 'Q4-2026')!.sueloNotaResenas).toBe(4.4);
+    guardarNiveles(db, 'L1', 'Q4-2026', [{ kpi: 'K2_TICKET', umbral: 31, objetivo: 37, excelencia: 39 }], 'juancho');
+    expect(aplicarCartas(db)).toEqual([]);
+    expect(config(db, 'L1', 'Q4-2026')!.niveles.K2_TICKET!.umbral).toBe(31);
+  });
+});
