@@ -27,6 +27,7 @@ const A: [string, string][] = [
   ['A_musica', 'Música'],
   ['A_wifi', 'WiFi'],
   ['A_tpv', 'TPV y datáfono'],
+  ['A_enchufes', 'Enchufes: estado y presencia de suciedad'],
   ['A_aseos', 'Aseos'],
   ['A_mobiliario', 'Mobiliario y terraza'],
   ['A_accesos', 'Accesos y puertas'],
@@ -37,6 +38,7 @@ const A: [string, string][] = [
   ['A_barra_fregadero', 'Barra — Fregadero'],
   ['A_barra_grifo', 'Barra — Grifo de cerveza'],
   ['A_barra_lavavajillas', 'Barra — Lavavajillas'],
+  ['A_barra_enchufes', 'Barra — Enchufes: estado y presencia de suciedad'],
 ];
 const B: [string, string][] = [
   ['B_campana', 'Extracción y filtros de campana'],
@@ -46,11 +48,18 @@ const B: [string, string][] = [
   ['B_camara_positivo', 'Cámara de positivo'],
   ['B_camara_congelacion', 'Cámara de congelación'],
   ['B_mesas_frias', 'Mesas frías'],
-  ['B_abatidor', 'Abatidor'],
   ['B_freidoras', 'Freidoras y termostatos'],
   ['B_lavavajillas', 'Lavavajillas'],
   ['B_arqueta', 'Arqueta de grasas'],
   ['B_desagues', 'Desagües'],
+  ['B_enchufes', 'Enchufes: estado y presencia de grasa'],
+  ['B_television', 'Televisión: estado y presencia de grasa'],
+  ['B_cableado', 'Cableado suelto'],
+  ['B_gomas_timbres', 'Gomas de puertas y timbres de cocina'],
+  ['B_baldosas', 'Baldosas del suelo'],
+  ['B_azulejos', 'Azulejos de la cocina'],
+  ['B_vestuarios', 'Vestuarios'],
+  ['B_taquillas', 'Puertas de taquillas'],
 ];
 
 const db = abrir();

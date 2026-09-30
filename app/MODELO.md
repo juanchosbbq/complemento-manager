@@ -140,3 +140,9 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 
 - **Local 3 = Las Tablas.** Carta precargada desde "Objetivos Q4 2026 - Las Tablas" con el mismo mecanismo de un solo uso. Suelo de nota de reseñas 4,4 (igual al umbral de la nota, misma suposición que en los otros dos). Sin producto estratégico nombrado.
 - Cartas de Local 1 y Local 2 verificadas de nuevo contra Drive el 28-sep: sin cambios.
+
+## v6.4 (30-sep-2026) — catálogo de arranque
+
+- **Hoja B (cocina), 19 líneas**: se añaden enchufes y televisión (estado y presencia de grasa), cableado suelto, gomas de puertas y timbres de cocina, baldosas del suelo, azulejos, vestuarios y puertas de taquillas. **Sale el abatidor.**
+- **Hoja A (sala), 19 líneas**: se añaden enchufes y enchufes de barra (estado y presencia de suciedad).
+- Aplica igual al checklist semanal del Manager y al de Dirección. Se sincroniza solo en el arranque.
