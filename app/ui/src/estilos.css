@@ -145,3 +145,31 @@ th.obj, td.obj { font-weight: 700; color: var(--carbon); }
   .panel { overflow: visible !important; }
   .logro-kpi { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 }
+
+/* Tabla de KPIs: tres grupos — hoy | escala de la carta | resultado */
+.panel table tr.grupos th { font-size: 11px; padding: 6px 9px 0; border-bottom: 0; color: var(--tinta-suave); letter-spacing: .1em; }
+.panel table tr.grupos th.g-niv { text-align: center; border-bottom: 2px solid var(--linea); }
+.panel table tr.grupos th.g-res { text-align: center; border-bottom: 2px solid var(--carbon); }
+.panel table tr.grupos th.g-actual { border-bottom: 2px solid var(--granate); }
+th.g-actual, td.g-actual { background: #FBF6DC; }
+td.actual { font-size: 17px; font-weight: 700; color: var(--carbon); white-space: nowrap; }
+th.g-niv-ini, td.g-niv-ini { border-left: 2px solid var(--linea); }
+th.g-niv-fin, td.g-niv-fin { border-right: 2px solid var(--linea); }
+th.niv, td.niv { background: #FCFBF5; }
+td.obj { background: #F4F0DA; font-size: 15px; }
+th.g-res-ini, td.g-res-ini { padding-left: 14px; }
+.puntos-kpi { display: inline-flex; align-items: center; justify-content: center; min-width: 38px; height: 38px; padding: 0 4px; border-radius: 50%; border: 2px solid var(--carbon); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* Bloque de mejora por llave */
+.mejora { border-left: 4px solid var(--granate); }
+.mejora-llave { border: 1px solid var(--linea); border-radius: 4px; padding: 12px 14px; margin-top: 12px; }
+.mejora-llave.off { border-left: 4px solid var(--rojo); }
+.mejora-llave.on { border-left: 4px solid var(--verde); }
+.mejora-cab { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mejora-cab h3 { margin: 0; }
+.mejora-cab h3::after { display: none; }
+.mejora-estado { font-size: 13px; font-weight: 600; }
+.mejora-estado.on { color: var(--verde); } .mejora-estado.off { color: var(--rojo); }
+.mejora-falta { background: var(--rojo-suave); border-radius: 3px; padding: 8px 10px; margin: 10px 0 4px; font-size: 14px; }
+.mejora-kpi { display: grid; grid-template-columns: 74px 1fr; gap: 10px; align-items: start; padding: 8px 0; border-top: 1px dashed var(--linea); }
+.mejora-kpi:first-of-type { border-top: 0; }

@@ -161,3 +161,12 @@ describe('Cartas de objetivos precargadas', () => {
     expect(config(db, 'L1', 'Q4-2026')!.niveles.K2_TICKET!.umbral).toBe(31);
   });
 });
+
+describe('Semanas del checklist', () => {
+  it('no se puede guardar una semana futura', () => {
+    const db = dbPrueba();
+    const d = new Date(); d.setDate(d.getDate() + 14);
+    expect(() => guardarChecklist(db, 'L1', 'Q4-2026', semanaISO(d.toISOString().slice(0, 10)), 'A', 'M', null, [])).toThrow(/futura/);
+    expect(() => guardarChecklist(db, 'L1', 'Q4-2026', 'semana 3', 'A', 'M', null, [])).toThrow(/no válida/);
+  });
+});

@@ -282,8 +282,8 @@ function Local({ yo, localId, periodo, hasta, modelo, catalogo, locales, volver 
       {ilustrativo && <div className="aviso">Este local tiene datos o umbrales marcados como ilustrativos (sembrado de ejemplo). No son cifras de la empresa: sustitúyelos por los de la carta de objetivos y los reales.</div>}
       {err && <div className="error">{err}{yo.rol === 'DIRECCION' && ' — completa la configuración en «Cargar datos y configurar».'}</div>}
       {vista === 'seguimiento' && calc && <Detalle calc={calc} modelo={modelo} rol={yo.rol} />}
-      {vista === 'checklist' && datos && <Checklist key="m" localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
-      {vista === 'checklist-dir' && datos && yo.rol === 'DIRECCION' && <Checklist key="d" tipo="DIRECCION" localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklistsDireccion ?? []} nombre={yo.nombre} onGuardado={cargar} />}
+      {vista === 'checklist' && datos && <Checklist key="m" periodoInicio={periodo.inicio} localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
+      {vista === 'checklist-dir' && datos && yo.rol === 'DIRECCION' && <Checklist key="d" tipo="DIRECCION" periodoInicio={periodo.inicio} localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklistsDireccion ?? []} nombre={yo.nombre} onGuardado={cargar} />}
       {vista === 'datos' && datos && yo.rol === 'DIRECCION' && <Entrada localId={localId} periodoId={periodo.id} meses={periodo.meses} datos={datos} modelo={modelo} catalogo={catalogo} nombre={yo.nombre} onCambio={cargar} />}
       {vista === 'cierre' && datos && yo.rol === 'DIRECCION' && <Cierre localId={localId} periodoId={periodo.id} datos={datos} onCambio={cargar} />}
     </>

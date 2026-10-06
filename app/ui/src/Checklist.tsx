@@ -9,12 +9,40 @@ function semanaActual(): string {
   return `${y}-W${String(w).padStart(2, '0')}`;
 }
 
+/** Lunes de una semana ISO 'YYYY-Www'. */
+function lunesDe(sem: string): Date {
+  const [y, w] = sem.split('-W').map(Number);
+  const ene4 = new Date(Date.UTC(y, 0, 4));
+  const lunes1 = new Date(ene4); lunes1.setUTCDate(ene4.getUTCDate() - ((ene4.getUTCDay() || 7) - 1));
+  const d = new Date(lunes1); d.setUTCDate(lunes1.getUTCDate() + (w - 1) * 7); return d;
+}
+function semanaDe(fecha: Date): string {
+  const t = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
+  const dia = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dia);
+  const y = t.getUTCFullYear(); const w = Math.ceil((((t.getTime() - Date.UTC(y, 0, 1)) / 86400000) + 1) / 7);
+  return `${y}-W${String(w).padStart(2, '0')}`;
+}
+const fechaCorta = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' }).replace('.', '');
+/** Semanas seleccionables: de la actual hacia atrás hasta la del inicio del periodo. Nunca futuras. */
+export function semanasDisponibles(inicio: string | undefined, extra: string[] = []): { valor: string; texto: string }[] {
+  const actual = semanaActual();
+  const desde = inicio ? semanaDe(new Date(inicio + 'T00:00:00Z')) : actual;
+  const lista: string[] = [];
+  for (let d = lunesDe(actual); semanaDe(d) >= desde && lista.length < 60; d.setUTCDate(d.getUTCDate() - 7)) lista.push(semanaDe(d));
+  for (const e of extra) if (e <= actual && !lista.includes(e)) lista.push(e);
+  lista.sort((a, b) => b.localeCompare(a));
+  return lista.map(v => {
+    const l = lunesDe(v); const dom = new Date(l); dom.setUTCDate(l.getUTCDate() + 6);
+    return { valor: v, texto: `Semana ${Number(v.split('-W')[1])} · ${fechaCorta(l)} – ${fechaCorta(dom)}${v === actual ? ' (actual)' : ''}` };
+  });
+}
+
 type Props = {
   localId: string; localNombre: string; periodoId: string; catalogo: any[]; existentes: any[]; nombre: string;
-  onGuardado: () => void; tipo?: 'MANAGER' | 'DIRECCION';
+  onGuardado: () => void; tipo?: 'MANAGER' | 'DIRECCION'; periodoInicio?: string;
 };
 
-export function Checklist({ localId, localNombre, periodoId, catalogo, existentes, nombre, onGuardado, tipo = 'MANAGER' }: Props) {
+export function Checklist({ localId, localNombre, periodoId, catalogo, existentes, nombre, onGuardado, tipo = 'MANAGER', periodoInicio }: Props) {
   const esDir = tipo === 'DIRECCION';
   const ruta = `${esDir ? 'checklist-dir' : 'checklist'}/${localId}/${periodoId}`;
   const [hoja, setHoja] = useState<'A' | 'B'>('A');
@@ -63,7 +91,7 @@ export function Checklist({ localId, localNombre, periodoId, catalogo, existente
           : 'Cada línea se marca contra el criterio escrito. Una línea no conforme con aviso registrado en 24 h es válida: avisar nunca te va a perjudicar. Lo que resta es lo que Dirección encuentra y no estaba reportado.'}</p>
         <div className="form" style={{ marginBottom: 12 }}>
           <label>Hoja<select value={hoja} onChange={e => setHoja(e.target.value as 'A' | 'B')}><option value="A">A — Sala e instalaciones</option><option value="B">B — Cocina{esDir ? '' : ' (firma conjunta)'}</option></select></label>
-          <label>Semana<input value={semana} onChange={e => setSemana(e.target.value)} placeholder="2026-W41" /></label>
+          <label>Semana<select value={semana} onChange={e => setSemana(e.target.value)}>{semanasDisponibles(periodoInicio, existentes.map(x => x.semana)).map(o => <option key={o.valor} value={o.valor}>{o.texto}{existentes.some(x => x.semana === o.valor && x.hoja === hoja) ? ' ✓' : ''}</option>)}</select></label>
           <label>{esDir ? 'Firma de quien revisa' : 'Firma del Manager'}<input value={firmaM} onChange={e => setFirmaM(e.target.value)} /></label>
           {hoja === 'B' && !esDir && <label>Firma del Jefe de Cocina<input value={firmaJ} onChange={e => setFirmaJ(e.target.value)} placeholder="obligatoria en la hoja B" /></label>}
         </div>

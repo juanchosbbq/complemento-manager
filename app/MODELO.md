@@ -146,3 +146,9 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Hoja B (cocina), 19 líneas**: se añaden enchufes y televisión (estado y presencia de grasa), cableado suelto, gomas de puertas y timbres de cocina, baldosas del suelo, azulejos, vestuarios y puertas de taquillas. **Sale el abatidor.**
 - **Hoja A (sala), 19 líneas**: se añaden enchufes y enchufes de barra (estado y presencia de suciedad).
 - Aplica igual al checklist semanal del Manager y al de Dirección. Se sincroniza solo en el arranque.
+
+## v6.5 (5-oct-2026) — legibilidad
+
+- **Tabla de KPIs en tres grupos**: Hoy (columna **Actual**, antes "Valor", destacada) · Escala de la carta (50% · 90% · **100%** · 120%, enmarcada) · Resultado (logro en rectángulo de color y puntos en círculo).
+- **"Qué tienes que hacer en cada llave para mejorar"** sustituye a "Lo que falta para encender cada llave": por cada llave, si está apagada, qué haría falta para encenderla; y los indicadores por debajo de su objetivo, de peor a mejor, con un consejo concreto para el local.
+- **Checklist**: la semana se elige en un desplegable, de la actual hacia atrás hasta el inicio del trimestre, con fechas y una marca ✓ en las ya registradas. El servidor rechaza semanas futuras.

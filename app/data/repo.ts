@@ -156,6 +156,8 @@ const tablasChecklist = (t: TipoChecklist) => t === 'DIRECCION' ? ['checklist_di
 
 export function guardarChecklist(db: DB, localId: string, periodoId: string, semana: string, hoja: 'A' | 'B', firmaManager: string | null, firmaJefe: string | null, lineas: { linea_id: string; estado: string; aviso_en_24h: boolean; observacion?: string }[], tipo: TipoChecklist = 'MANAGER') {
   const [TS, TL] = tablasChecklist(tipo);
+  if (!/^\d{4}-W\d{2}$/.test(semana)) throw new Error('Semana no válida');
+  if (semana > semanaISO(new Date().toISOString().slice(0, 10))) throw new Error('No se puede registrar el checklist de una semana futura');
   if (tipo === 'MANAGER' && hoja === 'B' && (!firmaManager || !firmaJefe)) throw new Error('La hoja B requiere firma del Manager y del Jefe de Cocina');
   if (!firmaManager) throw new Error(tipo === 'DIRECCION' ? 'Falta la firma de quien hace la revisión' : 'La hoja A requiere firma del Manager');
   run(db, `INSERT INTO ${TS} (local_id, periodo_id, semana, hoja, firma_manager, firma_jefe_cocina, ts) VALUES (?,?,?,?,?,?,?)

@@ -146,7 +146,7 @@ if (process.argv.includes('--ejemplo')) {
   repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 87500, ticket_medio: 35.7, productos_penetracion: 11.2, resenas_volumen: 78, resenas_nota_media: 4.6, prevision_facturacion: 85000, prevision_resenas: 75 }, ILU);
   repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
   const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
-  for (const s of semanas) {
+  for (const s of semanas.filter(x => x <= repo.semanaISO(new Date().toISOString().slice(0, 10)))) {
     repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map(([id]) => ({ linea_id: id, estado: 'CONFORME', aviso_en_24h: false })));
     repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'B', 'Manager Local 1', 'Jefe de Cocina 1',
       B.map(([id], i) => ({ linea_id: id, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
