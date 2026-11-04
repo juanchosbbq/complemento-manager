@@ -3,18 +3,33 @@ import { ConfigPeriodo, DatosPeriodo, MesDatos, agregar, construirEntrada } from
 import { liquidar } from './liquidar';
 
 const mes = (m: string, o: Partial<MesDatos> = {}): MesDatos => ({
-  mes: m, facturacionReal: 100000, ticketMedio: 20, productosPenetracion: 30,
-  resenasVolumen: 40, resenasNotaMedia: 4.6, previsionFacturacion: 100000, previsionResenas: 40, ...o,
+  mes: m,
+  facturacionReal: 100000,
+  ticketMedio: 20,
+  productosPenetracion: 30,
+  resenasVolumen: 40,
+  resenasNotaMedia: 4.6,
+  previsionFacturacion: 100000,
+  previsionResenas: 40,
+  ...o,
 });
 const vacio = (): DatosPeriodo => ({
-  meses: [], uber: [], checklist: [], hallazgos: [], fichas: [], compromisos: { iniciativasTotal: 0, iniciativasEnPlazo: 0, reportesTotal: 0, reportesEnFecha: 0 },
-  cualitativa: 8, descuentos: [], neutralizaciones: [],
+  meses: [],
+  uber: [],
+  checklist: [],
+  hallazgos: [],
+  fichas: [],
+  compromisos: { iniciativasTotal: 0, iniciativasEnPlazo: 0, reportesTotal: 0, reportesEnFecha: 0 },
+  cualitativa: 8,
+  descuentos: [],
+  neutralizaciones: [],
 });
 const cfg = (o: Partial<ConfigPeriodo> = {}): ConfigPeriodo => ({
-  importeObjetivo: 1500, perfilCanal: 'MIXTO',
+  importeObjetivo: 1500,
+  perfilCanal: 'MIXTO',
   niveles: {
     K1_FACTURACION: { umbral: 240000, llave: 285000, objetivo: 300000, excelencia: 330000 }, // € del trimestre
-    K2_TICKET: { umbral: 18, llave: 19.5, objetivo: 20, excelencia: 21 },                        // €
+    K2_TICKET: { umbral: 18, llave: 19.5, objetivo: 20, excelencia: 21 }, // €
     K3_PRODUCTOS: { umbral: 25, objetivo: 30, excelencia: 35 },
     K4A_RESENAS_VOLUMEN: { umbral: 90, llave: 110, objetivo: 120, excelencia: 150 }, // reseñas del trimestre
     K4B_RESENAS_NOTA: { umbral: 4.3, objetivo: 4.5, excelencia: 4.7 },
@@ -29,15 +44,22 @@ const cfg = (o: Partial<ConfigPeriodo> = {}): ConfigPeriodo => ({
     K12A_INICIATIVAS: { umbral: 70, objetivo: 90, excelencia: 100 },
     K12B_REPORTES: { umbral: 80, objetivo: 95, excelencia: 100 },
   },
-  sueloNotaResenas: 4.2, umbralDescuentosPct: 0.3,
+  sueloNotaResenas: 4.2,
+  umbralDescuentosPct: 0.3,
   puertas: { seguridadAlimentaria: true, reporting: true, controlCaja: true, integridad: true },
-  prorrateo: 1, bajaVoluntaria: false, ...o,
+  prorrateo: 1,
+  bajaVoluntaria: false,
+  ...o,
 });
 
 describe('Facturación, ticket y reseñas en valor absoluto contra niveles del trimestre', () => {
   it('facturación: suma de los meses con dato, en €', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { facturacionReal: 80000 }), mes('2026-11', { facturacionReal: 100000 }), mes('2026-12', { facturacionReal: 150000 })];
+    d.meses = [
+      mes('2026-10', { facturacionReal: 80000 }),
+      mes('2026-11', { facturacionReal: 100000 }),
+      mes('2026-12', { facturacionReal: 150000 }),
+    ];
     const a = agregar(d, cfg());
     expect(a.valores.K1_FACTURACION.valor).toBe(330000);
     expect(a.escalaNiveles.K1_FACTURACION).toBe(1);
@@ -45,7 +67,11 @@ describe('Facturación, ticket y reseñas en valor absoluto contra niveles del t
   it('acumulado a fecha: los niveles se prorratean con el reparto mensual del objetivo, no a partes iguales', () => {
     const d = vacio();
     // reparto 25 / 25 / 50: con solo octubre cargado, los niveles se escalan al 25%
-    d.meses = [mes('2026-10', { facturacionReal: 70000, previsionFacturacion: 75000 }), mes('2026-11', { facturacionReal: null, ticketMedio: null, previsionFacturacion: 75000 }), mes('2026-12', { facturacionReal: null, ticketMedio: null, previsionFacturacion: 150000 })];
+    d.meses = [
+      mes('2026-10', { facturacionReal: 70000, previsionFacturacion: 75000 }),
+      mes('2026-11', { facturacionReal: null, ticketMedio: null, previsionFacturacion: 75000 }),
+      mes('2026-12', { facturacionReal: null, ticketMedio: null, previsionFacturacion: 150000 }),
+    ];
     const { entrada, agregados } = construirEntrada(d, cfg());
     expect(agregados.escalaNiveles.K1_FACTURACION).toBe(0.25);
     expect(entrada.kpis.K1_FACTURACION!.niveles).toEqual({ umbral: 60000, llave: 71250, objetivo: 75000, excelencia: 82500 });
@@ -54,7 +80,11 @@ describe('Facturación, ticket y reseñas en valor absoluto contra niveles del t
   });
   it('sin previsión mensual, se prorratea por meses transcurridos', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { previsionFacturacion: null }), mes('2026-11', { facturacionReal: null, ticketMedio: null, previsionFacturacion: null }), mes('2026-12', { facturacionReal: null, ticketMedio: null, previsionFacturacion: null })];
+    d.meses = [
+      mes('2026-10', { previsionFacturacion: null }),
+      mes('2026-11', { facturacionReal: null, ticketMedio: null, previsionFacturacion: null }),
+      mes('2026-12', { facturacionReal: null, ticketMedio: null, previsionFacturacion: null }),
+    ];
     const a = agregar(d, cfg());
     expect(a.escalaNiveles.K1_FACTURACION).toBeCloseTo(1 / 3, 6);
     expect(a.aux.hayPrevision).toBe(false);
@@ -69,7 +99,11 @@ describe('Facturación, ticket y reseñas en valor absoluto contra niveles del t
   });
   it('reseñas: volumen acumulado y nota media de todas las reseñas, no media de medias', () => {
     const d = vacio();
-    d.meses = [mes('2026-10', { resenasVolumen: 10, resenasNotaMedia: 3 }), mes('2026-11', { resenasVolumen: 90, resenasNotaMedia: 5 }), mes('2026-12', { resenasVolumen: null })];
+    d.meses = [
+      mes('2026-10', { resenasVolumen: 10, resenasNotaMedia: 3 }),
+      mes('2026-11', { resenasVolumen: 90, resenasNotaMedia: 5 }),
+      mes('2026-12', { resenasVolumen: null }),
+    ];
     const a = agregar(d, cfg());
     expect(a.valores.K4A_RESENAS_VOLUMEN.valor).toBe(100);
     expect(a.valores.K4B_RESENAS_NOTA.valor).toBe(4.8); // (10×3 + 90×5)/100, no 4,0
@@ -84,14 +118,23 @@ describe('Facturación, ticket y reseñas en valor absoluto contra niveles del t
 
 describe('Checklist de mantenimiento (decisión 7)', () => {
   const linea = (hoja: 'A' | 'B', id: string, o: Partial<DatosPeriodo['checklist'][0]> = {}) => ({
-    semana: '2026-W41', hoja, lineaId: id, estado: 'CONFORME' as const, avisoEn24h: false, hallazgoNoReportado: false, ...o,
+    semana: '2026-W41',
+    hoja,
+    lineaId: id,
+    estado: 'CONFORME' as const,
+    avisoEn24h: false,
+    hallazgoNoReportado: false,
+    ...o,
   });
   it('NO CONFORME con aviso en 24 h es válida; sin aviso, no; hallazgo no reportado, no', () => {
     const d = vacio();
     d.checklist = [
-      linea('A', 'a1'), linea('A', 'a2', { estado: 'NO_CONFORME', avisoEn24h: true }),
-      linea('A', 'a3', { estado: 'NO_CONFORME', avisoEn24h: false }), linea('A', 'a4', { hallazgoNoReportado: true }),
-      linea('B', 'b1'), linea('B', 'b2'),
+      linea('A', 'a1'),
+      linea('A', 'a2', { estado: 'NO_CONFORME', avisoEn24h: true }),
+      linea('A', 'a3', { estado: 'NO_CONFORME', avisoEn24h: false }),
+      linea('A', 'a4', { hallazgoNoReportado: true }),
+      linea('B', 'b1'),
+      linea('B', 'b2'),
     ];
     const a = agregar(d, cfg());
     expect(a.aux.fiabilidadA).toBe(50);
@@ -99,7 +142,11 @@ describe('Checklist de mantenimiento (decisión 7)', () => {
   });
   it('computa la peor hoja: sala 100 y cocina 60 → 60', () => {
     const d = vacio();
-    d.checklist = [linea('A', 'a1'), linea('A', 'a2'), ...[1, 2, 3, 4, 5].map(i => linea('B', 'b' + i, i > 3 ? { estado: 'NO_CONFORME' } : {}))];
+    d.checklist = [
+      linea('A', 'a1'),
+      linea('A', 'a2'),
+      ...[1, 2, 3, 4, 5].map(i => linea('B', 'b' + i, i > 3 ? { estado: 'NO_CONFORME' } : {})),
+    ];
     expect(agregar(d, cfg()).valores.K10_CHECKLIST.valor).toBe(60);
   });
 });
@@ -145,7 +192,10 @@ describe('Uber Eats', () => {
 describe('Descuentos y compromisos', () => {
   it('0,31% excede; 0,30% no', () => {
     const d = vacio();
-    d.descuentos = [{ mes: '2026-10', ventas: 100000, noTipificados: 300 }, { mes: '2026-11', ventas: 100000, noTipificados: 310 }];
+    d.descuentos = [
+      { mes: '2026-10', ventas: 100000, noTipificados: 300 },
+      { mes: '2026-11', ventas: 100000, noTipificados: 310 },
+    ];
     const a = agregar(d, cfg());
     expect(a.aux.descuentosPorMes[0].excedido).toBe(false);
     expect(a.aux.descuentosPorMes[1].excedido).toBe(true);
@@ -161,7 +211,10 @@ describe('Descuentos y compromisos', () => {
 describe('Cliente misterioso', () => {
   it('cuenta fichas y consumición', () => {
     const d = vacio();
-    d.fichas = [{ fecha: '2026-10-10', sala: 9, producto: null }, { fecha: '2026-11-10', sala: 8, producto: 7 }];
+    d.fichas = [
+      { fecha: '2026-10-10', sala: 9, producto: null },
+      { fecha: '2026-11-10', sala: 8, producto: 7 },
+    ];
     const a = agregar(d, cfg());
     expect(a.valores.K6A_MISTERIOSO_SALA.valor).toBe(8.5);
     expect(a.valores.K6B_MISTERIOSO_PRODUCTO.valor).toBe(7);
@@ -174,9 +227,28 @@ describe('Extremo a extremo: datos brutos → liquidación', () => {
   it('un trimestre completo se liquida y es explicable', () => {
     const d = vacio();
     d.meses = ['2026-10', '2026-11', '2026-12'].map(m => mes(m));
-    d.uber = ['2026-10', '2026-11', '2026-12'].map(m => ({ mes: m, pedidos: 1000, inaccurateRate: 2, foodQualityRate: 0.6, onlineRate: 100, rating: 4.5 }));
-    d.checklist = ['A', 'B'].flatMap(h => [1, 2, 3, 4, 5].map(i => ({ semana: '2026-W41', hoja: h as 'A' | 'B', lineaId: h + i, estado: 'CONFORME' as const, avisoEn24h: false, hallazgoNoReportado: false })));
-    d.fichas = [{ fecha: '2026-10-10', sala: 8, producto: 8 }, { fecha: '2026-11-10', sala: 8, producto: null }];
+    d.uber = ['2026-10', '2026-11', '2026-12'].map(m => ({
+      mes: m,
+      pedidos: 1000,
+      inaccurateRate: 2,
+      foodQualityRate: 0.6,
+      onlineRate: 100,
+      rating: 4.5,
+    }));
+    d.checklist = ['A', 'B'].flatMap(h =>
+      [1, 2, 3, 4, 5].map(i => ({
+        semana: '2026-W41',
+        hoja: h as 'A' | 'B',
+        lineaId: h + i,
+        estado: 'CONFORME' as const,
+        avisoEn24h: false,
+        hallazgoNoReportado: false,
+      })),
+    );
+    d.fichas = [
+      { fecha: '2026-10-10', sala: 8, producto: 8 },
+      { fecha: '2026-11-10', sala: 8, producto: null },
+    ];
     d.compromisos = { iniciativasTotal: 2, iniciativasEnPlazo: 2, reportesTotal: 13, reportesEnFecha: 13 };
     d.descuentos = [{ mes: '2026-10', ventas: 100000, noTipificados: 0 }];
     const { entrada } = construirEntrada(d, cfg());

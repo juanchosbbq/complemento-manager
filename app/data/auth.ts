@@ -17,7 +17,10 @@ export const MIN_PASSWORD = 10;
 const MAX_INTENTOS = 5;
 const BLOQUEO_MIN = 15;
 
-const normalizar = (email: string) => String(email ?? '').trim().toLowerCase();
+const normalizar = (email: string) =>
+  String(email ?? '')
+    .trim()
+    .toLowerCase();
 export const emailValido = (e: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
 
 function hashear(password: string, sal?: string) {
@@ -38,19 +41,26 @@ export function validarPassword(p: string) {
 const intentos = new Map<string, { n: number; hasta: number }>();
 function comprobarBloqueo(email: string) {
   const i = intentos.get(email);
-  if (i && i.n >= MAX_INTENTOS && Date.now() < i.hasta) throw new Error(`Demasiados intentos. Vuelve a probar en ${Math.ceil((i.hasta - Date.now()) / 60000)} min`);
+  if (i && i.n >= MAX_INTENTOS && Date.now() < i.hasta)
+    throw new Error(`Demasiados intentos. Vuelve a probar en ${Math.ceil((i.hasta - Date.now()) / 60000)} min`);
 }
 function registrarFallo(email: string) {
   const i = intentos.get(email) ?? { n: 0, hasta: 0 };
-  i.n += 1; if (i.n >= MAX_INTENTOS) i.hasta = Date.now() + BLOQUEO_MIN * 60000;
+  i.n += 1;
+  if (i.n >= MAX_INTENTOS) i.hasta = Date.now() + BLOQUEO_MIN * 60000;
   intentos.set(email, i);
 }
 
 // ---- usuarios ----
-export const usuarios = (db: DB) => all(db, 'SELECT email, nombre, rol, local_id, activo, debe_cambiar, creado_por, ts, ultimo_acceso FROM usuarios ORDER BY rol, nombre');
+export const usuarios = (db: DB) =>
+  all(db, 'SELECT email, nombre, rol, local_id, activo, debe_cambiar, creado_por, ts, ultimo_acceso FROM usuarios ORDER BY rol, nombre');
 export const hayUsuarios = (db: DB) => ((get(db, 'SELECT COUNT(*) AS n FROM usuarios') as any).n as number) > 0;
 
-export function crearUsuario(db: DB, u: { email: string; nombre: string; rol: 'DIRECCION' | 'MANAGER'; local_id?: string | null; password: string; debe_cambiar?: boolean }, creadoPor: string) {
+export function crearUsuario(
+  db: DB,
+  u: { email: string; nombre: string; rol: 'DIRECCION' | 'MANAGER'; local_id?: string | null; password: string; debe_cambiar?: boolean },
+  creadoPor: string,
+) {
   const email = normalizar(u.email);
   if (!emailValido(email)) throw new Error('Correo no válido');
   if (!u.nombre?.trim()) throw new Error('Falta el nombre');
@@ -58,11 +68,27 @@ export function crearUsuario(db: DB, u: { email: string; nombre: string; rol: 'D
   if (get(db, 'SELECT 1 FROM usuarios WHERE email = ?', email)) throw new Error('Ya existe un usuario con ese correo');
   validarPassword(u.password);
   const { sal, hash } = hashear(u.password);
-  run(db, 'INSERT INTO usuarios (email, nombre, rol, local_id, hash, sal, activo, debe_cambiar, creado_por, ts) VALUES (?,?,?,?,?,?,1,?,?,?)',
-    email, u.nombre.trim(), u.rol, u.rol === 'MANAGER' ? u.local_id : null, hash, sal, u.debe_cambiar ? 1 : 0, creadoPor, ahora());
+  run(
+    db,
+    'INSERT INTO usuarios (email, nombre, rol, local_id, hash, sal, activo, debe_cambiar, creado_por, ts) VALUES (?,?,?,?,?,?,1,?,?,?)',
+    email,
+    u.nombre.trim(),
+    u.rol,
+    u.rol === 'MANAGER' ? u.local_id : null,
+    hash,
+    sal,
+    u.debe_cambiar ? 1 : 0,
+    creadoPor,
+    ahora(),
+  );
 }
 
-export function actualizarUsuario(db: DB, email: string, c: { nombre?: string; rol?: 'DIRECCION' | 'MANAGER'; local_id?: string | null; activo?: boolean }, porQuien: string) {
+export function actualizarUsuario(
+  db: DB,
+  email: string,
+  c: { nombre?: string; rol?: 'DIRECCION' | 'MANAGER'; local_id?: string | null; activo?: boolean },
+  porQuien: string,
+) {
   email = normalizar(email);
   const u = get(db, 'SELECT * FROM usuarios WHERE email = ?', email);
   if (!u) throw new Error('Usuario no encontrado');
@@ -70,8 +96,17 @@ export function actualizarUsuario(db: DB, email: string, c: { nombre?: string; r
   const local = rol === 'MANAGER' ? (c.local_id === undefined ? u.local_id : c.local_id) : null;
   if (rol === 'MANAGER' && !local) throw new Error('Un Manager necesita un local asignado');
   const activo = c.activo === undefined ? !!u.activo : c.activo;
-  if ((rol !== 'DIRECCION' || !activo) && esUltimoAdmin(db, email)) throw new Error('No puedes quitar el acceso de Dirección al único administrador');
-  run(db, 'UPDATE usuarios SET nombre = ?, rol = ?, local_id = ?, activo = ? WHERE email = ?', c.nombre?.trim() || u.nombre, rol, local, activo ? 1 : 0, email);
+  if ((rol !== 'DIRECCION' || !activo) && esUltimoAdmin(db, email))
+    throw new Error('No puedes quitar el acceso de Dirección al único administrador');
+  run(
+    db,
+    'UPDATE usuarios SET nombre = ?, rol = ?, local_id = ?, activo = ? WHERE email = ?',
+    c.nombre?.trim() || u.nombre,
+    rol,
+    local,
+    activo ? 1 : 0,
+    email,
+  );
   if (!activo) run(db, 'DELETE FROM sesiones WHERE email = ?', email);
 }
 
@@ -113,7 +148,10 @@ export function iniciarSesion(db: DB, email: string, password: string) {
   email = normalizar(email);
   comprobarBloqueo(email);
   const u = get(db, 'SELECT * FROM usuarios WHERE email = ?', email);
-  if (!u || !u.activo || !coincide(password ?? '', u.sal, u.hash)) { registrarFallo(email); throw new Error('Correo o contraseña incorrectos'); }
+  if (!u || !u.activo || !coincide(password ?? '', u.sal, u.hash)) {
+    registrarFallo(email);
+    throw new Error('Correo o contraseña incorrectos');
+  }
   intentos.delete(email);
   const token = randomBytes(32).toString('base64url');
   const caduca = new Date(Date.now() + DIAS_SESION * 86400000).toISOString();
@@ -126,13 +164,22 @@ export function sesion(db: DB, token: string | undefined) {
   if (!token) return null;
   const s = get(db, 'SELECT s.token, s.caduca, u.* FROM sesiones s JOIN usuarios u ON u.email = s.email WHERE s.token = ?', token);
   if (!s) return null;
-  if (s.caduca < ahora() || !s.activo) { run(db, 'DELETE FROM sesiones WHERE token = ?', token); return null; }
+  if (s.caduca < ahora() || !s.activo) {
+    run(db, 'DELETE FROM sesiones WHERE token = ?', token);
+    return null;
+  }
   return { ...perfil(s), token };
 }
 export const cerrarSesion = (db: DB, token: string) => run(db, 'DELETE FROM sesiones WHERE token = ?', token);
 export const limpiarSesionesCaducadas = (db: DB) => run(db, 'DELETE FROM sesiones WHERE caduca < ?', ahora());
 
-const perfil = (u: Row) => ({ email: u.email, nombre: u.nombre, rol: u.rol as 'DIRECCION' | 'MANAGER', local_id: u.local_id ?? null, debe_cambiar: !!u.debe_cambiar });
+const perfil = (u: Row) => ({
+  email: u.email,
+  nombre: u.nombre,
+  rol: u.rol as 'DIRECCION' | 'MANAGER',
+  local_id: u.local_id ?? null,
+  debe_cambiar: !!u.debe_cambiar,
+});
 
 /**
  * Crea el primer administrador si no hay ningún usuario. La contraseña sale de ADMIN_PASSWORD o,

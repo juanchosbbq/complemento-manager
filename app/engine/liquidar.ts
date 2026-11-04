@@ -4,12 +4,27 @@
  * Salida: resultado explicable KPI a KPI, bloque a bloque.
  */
 import {
-  BLOQUES, BLOQUES_LLAVE, Bloque, COEF_LLAVES, CORTE_LLAVE, ESCALA, KPIS, KPI_POR_ID, KpiId,
-  MOTIVO_NEUTRALIZACION_TEXTO, MotivoNeutralizacion, NOMBRE_BLOQUE, PESOS_BLOQUE, PerfilCanal, Sentido,
+  BLOQUES,
+  BLOQUES_LLAVE,
+  Bloque,
+  COEF_LLAVES,
+  CORTE_LLAVE,
+  ESCALA,
+  KPIS,
+  KPI_POR_ID,
+  KpiId,
+  MOTIVO_NEUTRALIZACION_TEXTO,
+  MotivoNeutralizacion,
+  NOMBRE_BLOQUE,
+  PESOS_BLOQUE,
+  PerfilCanal,
+  Sentido,
 } from './modelo';
 
 export interface Niveles {
-  umbral: number; objetivo: number; excelencia: number;
+  umbral: number;
+  objetivo: number;
+  excelencia: number;
   /** Punto calibrado a mano que corresponde a logro 90 (la llave del bloque). Si no se da, se interpola linealmente entre umbral y objetivo. */
   llave?: number;
 }
@@ -25,9 +40,9 @@ export interface ValorKpi {
 
 export interface Puertas {
   seguridadAlimentaria: boolean; // sin no conformidad crítica abierta y no escalada
-  reporting: boolean;            // ≥11 de 13 semanas
-  controlCaja: boolean;          // sin descuadres no justificados
-  integridad: boolean;           // sin expediente firme
+  reporting: boolean; // ≥11 de 13 semanas
+  controlCaja: boolean; // sin descuadres no justificados
+  integridad: boolean; // sin expediente firme
 }
 
 export interface EntradaLiquidacion {
@@ -53,11 +68,16 @@ export interface EntradaLiquidacion {
 }
 
 export interface ResultadoKpi {
-  id: KpiId; nombre: string; bloque: Bloque; sentido: Sentido;
-  pesoBase: number; pesoEfectivo: number;
-  valor: number | null; niveles: Niveles;
-  logro: number;   // 0–120
-  puntos: number;  // logro × pesoEfectivo / 100
+  id: KpiId;
+  nombre: string;
+  bloque: Bloque;
+  sentido: Sentido;
+  pesoBase: number;
+  pesoEfectivo: number;
+  valor: number | null;
+  niveles: Niveles;
+  logro: number; // 0–120
+  puntos: number; // logro × pesoEfectivo / 100
   neutralizado: boolean;
   /** sin dato todavía: en el seguimiento a fecha no cuenta como 0, se deja fuera de la nota del bloque */
   pendiente: boolean;
@@ -65,10 +85,17 @@ export interface ResultadoKpi {
 }
 
 export interface ResultadoBloque {
-  bloque: Bloque; nombre: string; peso: number; logro: number; puntos: number;
-  esLlave: boolean; llaveCumplida: boolean | null; semaforo: 'verde' | 'ambar' | 'rojo' | null;
+  bloque: Bloque;
+  nombre: string;
+  peso: number;
+  logro: number;
+  puntos: number;
+  esLlave: boolean;
+  llaveCumplida: boolean | null;
+  semaforo: 'verde' | 'ambar' | 'rojo' | null;
   /** peso de los indicadores que ya tienen dato; si hay pendientes, es menor que `peso` */
-  pesoMedido: number; pendientes: number;
+  pesoMedido: number;
+  pendientes: number;
   notas: string[];
 }
 
@@ -141,7 +168,8 @@ export function pesosEfectivos(e: EntradaLiquidacion): { pesos: Record<KpiId, nu
       pesos[d] += (liberado * pesos[d]) / total;
       nota(d, 'Recibe parte del peso del cliente misterioso (menos de dos fichas)');
     }
-    pesos.K6A_MISTERIOSO_SALA = 0; pesos.K6B_MISTERIOSO_PRODUCTO = 0;
+    pesos.K6A_MISTERIOSO_SALA = 0;
+    pesos.K6B_MISTERIOSO_PRODUCTO = 0;
     nota('K6A_MISTERIOSO_SALA', `Solo ${e.condiciones.fichasMisterioso} ficha(s) en el trimestre: no computa`);
   }
   // Salvaguarda de reseñas: nota bajo suelo → el volumen no computa, su peso pasa a nota (decisión 3, lectura B)
@@ -158,7 +186,8 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
   const explicacion: string[] = [];
   const { pesos, notas: notasPeso } = pesosEfectivos(e);
   const pesosBloque = PESOS_BLOQUE[e.perfilCanal];
-  if (e.perfilCanal !== 'MIXTO') explicacion.push(`Perfil de pesos ${e.perfilCanal}: Atención ${pesosBloque.ATENCION} · Operaciones ${pesosBloque.OPERACIONES}`);
+  if (e.perfilCanal !== 'MIXTO')
+    explicacion.push(`Perfil de pesos ${e.perfilCanal}: Atención ${pesosBloque.ATENCION} · Operaciones ${pesosBloque.OPERACIONES}`);
 
   const kpis: ResultadoKpi[] = KPIS.map(def => {
     const v = e.kpis[def.id];
@@ -171,7 +200,8 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
     if (pesoEfectivo === 0) {
       logro = 0;
     } else if (v?.neutralizacion) {
-      neutralizado = true; logro = ESCALA.objetivo;
+      neutralizado = true;
+      logro = ESCALA.objetivo;
       notas.push(`Neutralizado al 100%: ${MOTIVO_NEUTRALIZACION_TEXTO[v.neutralizacion.motivo]}`);
       if (v.neutralizacion.evidencia) notas.push(`Evidencia: ${v.neutralizacion.evidencia}`);
     } else if (!v || v.valor === null) {
@@ -183,9 +213,19 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
     }
     if (v?.detalle) notas.push(v.detalle);
     return {
-      id: def.id, nombre: def.nombre, bloque: def.bloque, sentido: def.sentido,
-      pesoBase: def.peso, pesoEfectivo, valor: v?.valor ?? null, niveles,
-      logro: r1(logro), puntos: r2((logro * pesoEfectivo) / 100), neutralizado, pendiente, notas,
+      id: def.id,
+      nombre: def.nombre,
+      bloque: def.bloque,
+      sentido: def.sentido,
+      pesoBase: def.peso,
+      pesoEfectivo,
+      valor: v?.valor ?? null,
+      niveles,
+      logro: r1(logro),
+      puntos: r2((logro * pesoEfectivo) / 100),
+      neutralizado,
+      pendiente,
+      notas,
     };
   });
 
@@ -201,7 +241,10 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
     const logro = pesoMedido > 0 ? (puntosMedidos / pesoMedido) * 100 : 0;
     const esLlave = BLOQUES_LLAVE.includes(b);
     const notas: string[] = [];
-    if (e.parcial && pendientes > 0) notas.push(`${pendientes} indicador${pendientes > 1 ? 'es' : ''} todavía sin dato: la nota de este bloque está calculada sobre lo que ya se puede medir`);
+    if (e.parcial && pendientes > 0)
+      notas.push(
+        `${pendientes} indicador${pendientes > 1 ? 'es' : ''} todavía sin dato: la nota de este bloque está calculada sobre lo que ya se puede medir`,
+      );
     let llaveCumplida: boolean | null = null;
     if (esLlave) {
       llaveCumplida = logro >= CORTE_LLAVE;
@@ -210,23 +253,43 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
         notas.push('Descuentos no tipificados por encima del umbral en algún mes: el bloque puntúa pero no cuenta como llave cumplida');
       }
     }
-    return { bloque: b, nombre: NOMBRE_BLOQUE[b], peso, logro: r1(logro), puntos: r2(puntos), pesoMedido: r2(pesoMedido), pendientes, esLlave, llaveCumplida, semaforo: esLlave ? semaforo(logro) : null, notas };
+    return {
+      bloque: b,
+      nombre: NOMBRE_BLOQUE[b],
+      peso,
+      logro: r1(logro),
+      puntos: r2(puntos),
+      pesoMedido: r2(pesoMedido),
+      pendientes,
+      esLlave,
+      llaveCumplida,
+      semaforo: esLlave ? semaforo(logro) : null,
+      notas,
+    };
   });
 
   const pendientes = kpis.filter(k => k.pendiente && k.pesoEfectivo > 0).length;
   // Con pendientes, la nota se lee sobre el peso que ya tiene dato (si no, bajaría sola según pasa el trimestre).
   const pesoMedidoTotal = bloques.reduce((s, b) => s + b.pesoMedido, 0);
   const puntosMedidos = kpis.filter(k => !e.parcial || !k.pendiente).reduce((s, k) => s + (k.logro * k.pesoEfectivo) / 100, 0);
-  const logroPonderado = e.parcial && pesoMedidoTotal > 0 ? (puntosMedidos / pesoMedidoTotal) * 100 : bloques.reduce((s, b) => s + b.puntos, 0);
+  const logroPonderado =
+    e.parcial && pesoMedidoTotal > 0 ? (puntosMedidos / pesoMedidoTotal) * 100 : bloques.reduce((s, b) => s + b.puntos, 0);
   const llavesCumplidas = bloques.filter(b => b.esLlave && b.llaveCumplida).length;
   const coefLlaves = COEF_LLAVES[llavesCumplidas] ?? 0;
   const superadas = e.puertas.seguridadAlimentaria && e.puertas.reporting && e.puertas.controlCaja && e.puertas.integridad;
 
-  for (const b of bloques.filter(b => b.esLlave && !b.llaveCumplida)) explicacion.push(`Llave de ${b.bloque} no cumplida (${b.logro}% < ${CORTE_LLAVE}%)`);
-  if (e.parcial && pendientes > 0) explicacion.push(`${pendientes} indicador(es) todavía sin dato: la nota está calculada sobre el ${r1(pesoMedidoTotal)}% del cuadro que ya se puede medir`);
+  for (const b of bloques.filter(b => b.esLlave && !b.llaveCumplida))
+    explicacion.push(`Llave de ${b.bloque} no cumplida (${b.logro}% < ${CORTE_LLAVE}%)`);
+  if (e.parcial && pendientes > 0)
+    explicacion.push(
+      `${pendientes} indicador(es) todavía sin dato: la nota está calculada sobre el ${r1(pesoMedidoTotal)}% del cuadro que ya se puede medir`,
+    );
   explicacion.push(`Llaves cumplidas: ${llavesCumplidas} de 4 → coeficiente × ${coefLlaves.toFixed(2)}`);
   if (!superadas) {
-    const f = Object.entries(e.puertas).filter(([, v]) => !v).map(([k]) => k).join(', ');
+    const f = Object.entries(e.puertas)
+      .filter(([, v]) => !v)
+      .map(([k]) => k)
+      .join(', ');
     explicacion.push(`Puerta de acceso no superada (${f}): el complemento del trimestre es 0`);
   }
   if (e.bajaVoluntaria) explicacion.push('Baja voluntaria en el periodo: se pierde el complemento del trimestre');
@@ -234,15 +297,26 @@ export function liquidar(e: EntradaLiquidacion): ResultadoLiquidacion {
 
   const importeAntesProrrateo = superadas && !e.bajaVoluntaria ? e.importeObjetivo * (logroPonderado / 100) * coefLlaves : 0;
   const pago = r2(importeAntesProrrateo * e.prorrateo);
-  explicacion.push(`Pago: ${e.importeObjetivo} € × ${r1(logroPonderado)}% × ${coefLlaves.toFixed(2)}${superadas ? '' : ' × 0'}${e.prorrateo < 1 ? ` × ${e.prorrateo.toFixed(3)}` : ''} = ${pago} € brutos`);
+  explicacion.push(
+    `Pago: ${e.importeObjetivo} € × ${r1(logroPonderado)}% × ${coefLlaves.toFixed(2)}${superadas ? '' : ' × 0'}${e.prorrateo < 1 ? ` × ${e.prorrateo.toFixed(3)}` : ''} = ${pago} € brutos`,
+  );
 
   return {
-    modelo: 'v7.1', kpis, bloques, logroPonderado: r1(logroPonderado), pendientes, llavesCumplidas, coefLlaves,
-    puertas: { ...e.puertas, superadas }, importeObjetivo: e.importeObjetivo,
-    importeAntesProrrateo: r2(importeAntesProrrateo), prorrateo: e.prorrateo, pago, explicacion,
+    modelo: 'v7.1',
+    kpis,
+    bloques,
+    logroPonderado: r1(logroPonderado),
+    pendientes,
+    llavesCumplidas,
+    coefLlaves,
+    puertas: { ...e.puertas, superadas },
+    importeObjetivo: e.importeObjetivo,
+    importeAntesProrrateo: r2(importeAntesProrrateo),
+    prorrateo: e.prorrateo,
+    pago,
+    explicacion,
   };
 }
-
 
 /** Inversa de logroKpi: qué valor hace falta para alcanzar un logro dado. */
 export function valorParaLogro(logro: number, n: Niveles, sentido: Sentido): number {
@@ -258,8 +332,18 @@ export function valorParaLogro(logro: number, n: Niveles, sentido: Sentido): num
 }
 
 export interface FaltaLlave {
-  bloque: Bloque; nombre: string; logro: number;
-  opciones: { kpi: KpiId; nombre: string; sentido: Sentido; valorActual: number; valorNecesario: number; diferencia: number; logroNecesario: number }[];
+  bloque: Bloque;
+  nombre: string;
+  logro: number;
+  opciones: {
+    kpi: KpiId;
+    nombre: string;
+    sentido: Sentido;
+    valorActual: number;
+    valorNecesario: number;
+    diferencia: number;
+    logroNecesario: number;
+  }[];
 }
 
 /**
@@ -267,19 +351,30 @@ export interface FaltaLlave {
  * para encender la llave. Es la traducción de "Operaciones 88%" a "una incidencia menos".
  */
 export function faltaParaLlave(e: EntradaLiquidacion, r: ResultadoLiquidacion): FaltaLlave[] {
-  return r.bloques.filter(b => b.esLlave && !b.llaveCumplida && b.pesoMedido > 0).map(b => {
-    const ks = r.kpis.filter(k => k.bloque === b.bloque && k.pesoEfectivo > 0 && !k.pendiente && !k.neutralizado);
-    const puntosActuales = ks.reduce((s, k) => s + (k.logro * k.pesoEfectivo) / 100, 0);
-    const opciones = ks.flatMap(k => {
-      const faltanPuntos = (CORTE_LLAVE * b.pesoMedido) / 100 - puntosActuales;
-      const logroNecesario = k.logro + (faltanPuntos * 100) / k.pesoEfectivo;
-      if (logroNecesario > ESCALA.excelencia || logroNecesario <= k.logro || k.valor === null) return [];
-      const valorNecesario = valorParaLogro(logroNecesario, k.niveles, k.sentido);
-      return [{
-        kpi: k.id, nombre: k.nombre, sentido: k.sentido, valorActual: k.valor,
-        valorNecesario: r2(valorNecesario), diferencia: r2(Math.abs(valorNecesario - k.valor)), logroNecesario: r1(logroNecesario),
-      }];
-    }).sort((x, y) => x.logroNecesario - y.logroNecesario);
-    return { bloque: b.bloque, nombre: b.nombre, logro: b.logro, opciones };
-  });
+  return r.bloques
+    .filter(b => b.esLlave && !b.llaveCumplida && b.pesoMedido > 0)
+    .map(b => {
+      const ks = r.kpis.filter(k => k.bloque === b.bloque && k.pesoEfectivo > 0 && !k.pendiente && !k.neutralizado);
+      const puntosActuales = ks.reduce((s, k) => s + (k.logro * k.pesoEfectivo) / 100, 0);
+      const opciones = ks
+        .flatMap(k => {
+          const faltanPuntos = (CORTE_LLAVE * b.pesoMedido) / 100 - puntosActuales;
+          const logroNecesario = k.logro + (faltanPuntos * 100) / k.pesoEfectivo;
+          if (logroNecesario > ESCALA.excelencia || logroNecesario <= k.logro || k.valor === null) return [];
+          const valorNecesario = valorParaLogro(logroNecesario, k.niveles, k.sentido);
+          return [
+            {
+              kpi: k.id,
+              nombre: k.nombre,
+              sentido: k.sentido,
+              valorActual: k.valor,
+              valorNecesario: r2(valorNecesario),
+              diferencia: r2(Math.abs(valorNecesario - k.valor)),
+              logroNecesario: r1(logroNecesario),
+            },
+          ];
+        })
+        .sort((x, y) => x.logroNecesario - y.logroNecesario);
+      return { bloque: b.bloque, nombre: b.nombre, logro: b.logro, opciones };
+    });
 }

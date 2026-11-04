@@ -2,7 +2,11 @@ import { describe, expect, it } from 'vitest';
 import { abrir } from './db';
 import * as auth from './auth';
 
-const nueva = () => { const db = abrir(':memory:'); db.exec("INSERT INTO locales VALUES ('L1','Local 1','Madrid',1,1,1)"); return db; };
+const nueva = () => {
+  const db = abrir(':memory:');
+  db.exec("INSERT INTO locales VALUES ('L1','Local 1','Madrid',1,1,1)");
+  return db;
+};
 
 describe('Usuarios y contraseñas', () => {
   it('el primer administrador se crea una sola vez y debe cambiar la contraseña', () => {
@@ -20,14 +24,22 @@ describe('Usuarios y contraseñas', () => {
     const fila = db.prepare('SELECT hash, sal FROM usuarios WHERE email = ?').get('m1@x.com') as any;
     expect(fila.hash).not.toContain('clave');
     expect(fila.hash.length).toBe(128);
-    expect(() => auth.crearUsuario(db, { email: 'm2@x.com', nombre: 'M2', rol: 'MANAGER', local_id: 'L1', password: 'corta1' }, 'test')).toThrow(/al menos 10/);
-    expect(() => auth.crearUsuario(db, { email: 'm3@x.com', nombre: 'M3', rol: 'MANAGER', local_id: 'L1', password: 'sinnumerosaqui' }, 'test')).toThrow(/letras y números/);
+    expect(() =>
+      auth.crearUsuario(db, { email: 'm2@x.com', nombre: 'M2', rol: 'MANAGER', local_id: 'L1', password: 'corta1' }, 'test'),
+    ).toThrow(/al menos 10/);
+    expect(() =>
+      auth.crearUsuario(db, { email: 'm3@x.com', nombre: 'M3', rol: 'MANAGER', local_id: 'L1', password: 'sinnumerosaqui' }, 'test'),
+    ).toThrow(/letras y números/);
   });
   it('un Manager necesita local; el mismo correo no se repite', () => {
     const db = nueva();
-    expect(() => auth.crearUsuario(db, { email: 'm@x.com', nombre: 'M', rol: 'MANAGER', password: 'clave-segura-1' }, 't')).toThrow(/local/);
+    expect(() => auth.crearUsuario(db, { email: 'm@x.com', nombre: 'M', rol: 'MANAGER', password: 'clave-segura-1' }, 't')).toThrow(
+      /local/,
+    );
     auth.crearUsuario(db, { email: 'm@x.com', nombre: 'M', rol: 'MANAGER', local_id: 'L1', password: 'clave-segura-1' }, 't');
-    expect(() => auth.crearUsuario(db, { email: 'M@X.com', nombre: 'M', rol: 'MANAGER', local_id: 'L1', password: 'clave-segura-1' }, 't')).toThrow(/Ya existe/);
+    expect(() =>
+      auth.crearUsuario(db, { email: 'M@X.com', nombre: 'M', rol: 'MANAGER', local_id: 'L1', password: 'clave-segura-1' }, 't'),
+    ).toThrow(/Ya existe/);
   });
 });
 

@@ -3,9 +3,12 @@ import { api, post } from './api';
 import { compartirDrive, descargarPdf, docChecklist } from './pdf';
 
 function semanaActual(): string {
-  const d = new Date(); const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
-  const dia = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dia);
-  const y = t.getUTCFullYear(); const w = Math.ceil((((t.getTime() - Date.UTC(y, 0, 1)) / 86400000) + 1) / 7);
+  const d = new Date();
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const dia = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dia);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
   return `${y}-W${String(w).padStart(2, '0')}`;
 }
 
@@ -13,22 +16,33 @@ function semanaActual(): string {
 function lunesDe(sem: string): Date {
   const [y, w] = sem.split('-W').map(Number);
   const ene4 = new Date(Date.UTC(y, 0, 4));
-  const lunes1 = new Date(ene4); lunes1.setUTCDate(ene4.getUTCDate() - ((ene4.getUTCDay() || 7) - 1));
-  const d = new Date(lunes1); d.setUTCDate(lunes1.getUTCDate() + (w - 1) * 7); return d;
+  const lunes1 = new Date(ene4);
+  lunes1.setUTCDate(ene4.getUTCDate() - ((ene4.getUTCDay() || 7) - 1));
+  const d = new Date(lunes1);
+  d.setUTCDate(lunes1.getUTCDate() + (w - 1) * 7);
+  return d;
 }
 function semanaDe(fecha: Date): string {
   const t = new Date(Date.UTC(fecha.getUTCFullYear(), fecha.getUTCMonth(), fecha.getUTCDate()));
-  const dia = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - dia);
-  const y = t.getUTCFullYear(); const w = Math.ceil((((t.getTime() - Date.UTC(y, 0, 1)) / 86400000) + 1) / 7);
+  const dia = t.getUTCDay() || 7;
+  t.setUTCDate(t.getUTCDate() + 4 - dia);
+  const y = t.getUTCFullYear();
+  const w = Math.ceil(((t.getTime() - Date.UTC(y, 0, 1)) / 86400000 + 1) / 7);
   return `${y}-W${String(w).padStart(2, '0')}`;
 }
 /** Último día (incluido) en que el Manager puede tocar esa semana: domingo + `dias`. Misma regla que el servidor. */
 export function limiteEdicion(sem: string, dias = 5): string {
-  const d = lunesDe(sem); d.setUTCDate(d.getUTCDate() + 6 + dias); return d.toISOString().slice(0, 10);
+  const d = lunesDe(sem);
+  d.setUTCDate(d.getUTCDate() + 6 + dias);
+  return d.toISOString().slice(0, 10);
 }
-const hoyLocal = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+const hoyLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 export const editableManager = (sem: string, dias = 5) => hoyLocal() <= limiteEdicion(sem, dias);
-const fechaLarga = (iso: string) => new Date(iso + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
+const fechaLarga = (iso: string) =>
+  new Date(iso + 'T00:00:00Z').toLocaleDateString('es-ES', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'UTC' });
 const fechaCorta = (d: Date) => d.toLocaleDateString('es-ES', { day: 'numeric', month: 'short', timeZone: 'UTC' }).replace('.', '');
 /** Semanas seleccionables: de la actual hacia atrás hasta la del inicio del periodo. Nunca futuras. */
 export function semanasDisponibles(inicio: string | undefined, extra: string[] = []): { valor: string; texto: string }[] {
@@ -39,19 +53,44 @@ export function semanasDisponibles(inicio: string | undefined, extra: string[] =
   for (const e of extra) if (e <= actual && !lista.includes(e)) lista.push(e);
   lista.sort((a, b) => b.localeCompare(a));
   return lista.map(v => {
-    const l = lunesDe(v); const dom = new Date(l); dom.setUTCDate(l.getUTCDate() + 6);
-    return { valor: v, texto: `Semana ${Number(v.split('-W')[1])} · ${fechaCorta(l)} – ${fechaCorta(dom)}${v === actual ? ' (actual)' : ''}` };
+    const l = lunesDe(v);
+    const dom = new Date(l);
+    dom.setUTCDate(l.getUTCDate() + 6);
+    return {
+      valor: v,
+      texto: `Semana ${Number(v.split('-W')[1])} · ${fechaCorta(l)} – ${fechaCorta(dom)}${v === actual ? ' (actual)' : ''}`,
+    };
   });
 }
 
 type Props = {
-  localId: string; localNombre: string; periodoId: string; catalogo: any[]; existentes: any[]; nombre: string;
-  onGuardado: () => void; tipo?: 'MANAGER' | 'DIRECCION'; periodoInicio?: string;
+  localId: string;
+  localNombre: string;
+  periodoId: string;
+  catalogo: any[];
+  existentes: any[];
+  nombre: string;
+  onGuardado: () => void;
+  tipo?: 'MANAGER' | 'DIRECCION';
+  periodoInicio?: string;
   /** Rol de quien usa la pantalla: el Manager tiene ventana de edición; Dirección no. */
-  rol?: 'MANAGER' | 'DIRECCION'; diasEdicion?: number;
+  rol?: 'MANAGER' | 'DIRECCION';
+  diasEdicion?: number;
 };
 
-export function Checklist({ localId, localNombre, periodoId, catalogo, existentes, nombre, onGuardado, tipo = 'MANAGER', periodoInicio, rol = 'DIRECCION', diasEdicion = 5 }: Props) {
+export function Checklist({
+  localId,
+  localNombre,
+  periodoId,
+  catalogo,
+  existentes,
+  nombre,
+  onGuardado,
+  tipo = 'MANAGER',
+  periodoInicio,
+  rol = 'DIRECCION',
+  diasEdicion = 5,
+}: Props) {
   const esDir = tipo === 'DIRECCION';
   const conPlazo = rol === 'MANAGER';
   const editable = (sem: string) => !conPlazo || editableManager(sem, diasEdicion);
@@ -65,7 +104,10 @@ export function Checklist({ localId, localNombre, periodoId, catalogo, existente
   const lineasHoja = catalogo.filter(l => l.hoja === hoja);
   const existe = existentes.find(s => s.semana === semana && s.hoja === hoja);
   const bloqueada = !editable(semana);
-  const opcionesSemana = semanasDisponibles(periodoInicio, existentes.map(x => x.semana)).filter(o => editable(o.valor) || o.valor === semana);
+  const opcionesSemana = semanasDisponibles(
+    periodoInicio,
+    existentes.map(x => x.semana),
+  ).filter(o => editable(o.valor) || o.valor === semana);
 
   useEffect(() => {
     const base: typeof lineas = {};
@@ -73,71 +115,150 @@ export function Checklist({ localId, localNombre, periodoId, catalogo, existente
       const e = existe?.lineas?.find((x: any) => x.linea_id === l.linea_id);
       base[l.linea_id] = { estado: e?.estado ?? 'CONFORME', aviso: !!e?.aviso_en_24h, obs: e?.observacion ?? '' };
     }
-    setLineas(base); setFirmaM(existe?.firma_manager ?? nombre); setFirmaJ(existe?.firma_jefe_cocina ?? '');
+    setLineas(base);
+    setFirmaM(existe?.firma_manager ?? nombre);
+    setFirmaJ(existe?.firma_jefe_cocina ?? '');
   }, [hoja, semana, existentes, catalogo]);
 
   async function guardar() {
     setMsg(null);
     try {
       await post(ruta, {
-        semana, hoja, firma_manager: firmaM, firma_jefe_cocina: hoja === 'B' && !esDir ? firmaJ : null,
-        lineas: Object.entries(lineas).map(([linea_id, v]) => ({ linea_id, estado: v.estado, aviso_en_24h: v.aviso, observacion: v.obs || undefined })),
+        semana,
+        hoja,
+        firma_manager: firmaM,
+        firma_jefe_cocina: hoja === 'B' && !esDir ? firmaJ : null,
+        lineas: Object.entries(lineas).map(([linea_id, v]) => ({
+          linea_id,
+          estado: v.estado,
+          aviso_en_24h: v.aviso,
+          observacion: v.obs || undefined,
+        })),
       });
-      setMsg({ tipo: 'ok', texto: `Checklist ${hoja} de la semana ${semana} guardado.` }); onGuardado();
-    } catch (e: any) { setMsg({ tipo: 'error', texto: e.message }); }
+      setMsg({ tipo: 'ok', texto: `Checklist ${hoja} de la semana ${semana} guardado.` });
+      onGuardado();
+    } catch (e: any) {
+      setMsg({ tipo: 'error', texto: e.message });
+    }
   }
   async function borrar(s: any) {
     if (!confirm(`¿Borrar el checklist ${s.hoja} de la semana ${s.semana}?`)) return;
-    try { await api(ruta, { method: 'DELETE', body: { semana: s.semana, hoja: s.hoja } }); setMsg({ tipo: 'ok', texto: 'Checklist borrado.' }); onGuardado(); }
-    catch (e: any) { setMsg({ tipo: 'error', texto: e.message }); }
+    try {
+      await api(ruta, { method: 'DELETE', body: { semana: s.semana, hoja: s.hoja } });
+      setMsg({ tipo: 'ok', texto: 'Checklist borrado.' });
+      onGuardado();
+    } catch (e: any) {
+      setMsg({ tipo: 'error', texto: e.message });
+    }
   }
-  const editar = (s: any) => { setSemana(s.semana); setHoja(s.hoja); window.scrollTo({ top: 0, behavior: 'smooth' }); };
+  const editar = (s: any) => {
+    setSemana(s.semana);
+    setHoja(s.hoja);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
   const noConformesSinAviso = Object.values(lineas).filter(v => v.estado === 'NO_CONFORME' && !v.aviso).length;
-  const historico = [...existentes].sort((a, b) => (a.semana === b.semana ? a.hoja.localeCompare(b.hoja) : b.semana.localeCompare(a.semana)));
+  const historico = [...existentes].sort((a, b) =>
+    a.semana === b.semana ? a.hoja.localeCompare(b.hoja) : b.semana.localeCompare(a.semana),
+  );
 
   return (
     <>
       <section className="panel">
         <h2>{esDir ? 'Checklist de Dirección' : 'Checklist semanal de mantenimiento'}</h2>
-        <p className="small muted">{esDir
-          ? 'Revisión de Dirección con las mismas líneas. Queda registrada aparte y no cuenta en los indicadores del Manager.'
-          : 'Cada línea se marca contra el criterio escrito. Una línea no conforme con aviso registrado en 24 h es válida: avisar nunca te va a perjudicar. Lo que resta es lo que Dirección encuentra y no estaba reportado.'}</p>
-        {!esDir && <p className="small muted">{conPlazo
-          ? `Cada semana se puede registrar o corregir hasta ${diasEdicion} días después de que termine (el viernes siguiente). Pasado ese plazo queda cerrada; si hay que cambiarla, lo hace Dirección.`
-          : `El Manager solo puede registrar o corregir cada semana hasta ${diasEdicion} días después de que termine. Dirección puede corregir cualquier semana, y el cambio queda en el historial.`}</p>}
+        <p className="small muted">
+          {esDir
+            ? 'Revisión de Dirección con las mismas líneas. Queda registrada aparte y no cuenta en los indicadores del Manager.'
+            : 'Cada línea se marca contra el criterio escrito. Una línea no conforme con aviso registrado en 24 h es válida: avisar nunca te va a perjudicar. Lo que resta es lo que Dirección encuentra y no estaba reportado.'}
+        </p>
+        {!esDir && (
+          <p className="small muted">
+            {conPlazo
+              ? `Cada semana se puede registrar o corregir hasta ${diasEdicion} días después de que termine (el viernes siguiente). Pasado ese plazo queda cerrada; si hay que cambiarla, lo hace Dirección.`
+              : `El Manager solo puede registrar o corregir cada semana hasta ${diasEdicion} días después de que termine. Dirección puede corregir cualquier semana, y el cambio queda en el historial.`}
+          </p>
+        )}
         <div className="form" style={{ marginBottom: 12 }}>
-          <label>Hoja<select value={hoja} onChange={e => setHoja(e.target.value as 'A' | 'B')}><option value="A">A — Sala e instalaciones</option><option value="B">B — Cocina{esDir ? '' : ' (firma conjunta)'}</option></select></label>
-          <label>Semana<select value={semana} onChange={e => setSemana(e.target.value)}>{opcionesSemana.map(o => <option key={o.valor} value={o.valor}>{o.texto}{existentes.some(x => x.semana === o.valor && x.hoja === hoja) ? ' ✓' : ''}</option>)}</select></label>
-          <label>{esDir ? 'Firma de quien revisa' : 'Firma del Manager'}<input value={firmaM} disabled={bloqueada} onChange={e => setFirmaM(e.target.value)} /></label>
-          {hoja === 'B' && !esDir && <label>Firma del Jefe de Cocina<input value={firmaJ} disabled={bloqueada} onChange={e => setFirmaJ(e.target.value)} placeholder="obligatoria en la hoja B" /></label>}
+          <label>
+            Hoja
+            <select value={hoja} onChange={e => setHoja(e.target.value as 'A' | 'B')}>
+              <option value="A">A — Sala e instalaciones</option>
+              <option value="B">B — Cocina{esDir ? '' : ' (firma conjunta)'}</option>
+            </select>
+          </label>
+          <label>
+            Semana
+            <select value={semana} onChange={e => setSemana(e.target.value)}>
+              {opcionesSemana.map(o => (
+                <option key={o.valor} value={o.valor}>
+                  {o.texto}
+                  {existentes.some(x => x.semana === o.valor && x.hoja === hoja) ? ' ✓' : ''}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            {esDir ? 'Firma de quien revisa' : 'Firma del Manager'}
+            <input value={firmaM} disabled={bloqueada} onChange={e => setFirmaM(e.target.value)} />
+          </label>
+          {hoja === 'B' && !esDir && (
+            <label>
+              Firma del Jefe de Cocina
+              <input value={firmaJ} disabled={bloqueada} onChange={e => setFirmaJ(e.target.value)} placeholder="obligatoria en la hoja B" />
+            </label>
+          )}
         </div>
-        {bloqueada
-          ? <div className="aviso">El plazo de esta semana terminó el {fechaLarga(limiteEdicion(semana, diasEdicion))}: solo se puede consultar. Si hay que corregir algo, pídeselo a Dirección.</div>
-          : existe && <div className="aviso">Estás editando el checklist ya guardado de esta semana y hoja.{conPlazo && ` Puedes cambiarlo hasta el ${fechaLarga(limiteEdicion(semana, diasEdicion))}.`}</div>}
+        {bloqueada ? (
+          <div className="aviso">
+            El plazo de esta semana terminó el {fechaLarga(limiteEdicion(semana, diasEdicion))}: solo se puede consultar. Si hay que
+            corregir algo, pídeselo a Dirección.
+          </div>
+        ) : (
+          existe && (
+            <div className="aviso">
+              Estás editando el checklist ya guardado de esta semana y hoja.
+              {conPlazo && ` Puedes cambiarlo hasta el ${fechaLarga(limiteEdicion(semana, diasEdicion))}.`}
+            </div>
+          )
+        )}
         {lineasHoja.length === 0 && <div className="aviso">No hay líneas en el catálogo de la hoja {hoja}.</div>}
         <fieldset disabled={bloqueada} style={{ border: 0, padding: 0, margin: 0, minWidth: 0 }}>
-        {lineasHoja.map(l => {
-          const v = lineas[l.linea_id] ?? { estado: 'CONFORME', aviso: false, obs: '' };
-          const set = (p: Partial<typeof v>) => setLineas({ ...lineas, [l.linea_id]: { ...v, ...p } });
-          return (
-            <div className="fila-check" key={l.linea_id}>
-              <div className="fila-check-texto">{l.texto}</div>
-              <select value={v.estado} onChange={e => set({ estado: e.target.value })} className={'fila-check-estado' + (v.estado === 'NO_CONFORME' ? ' nc' : '')}>
-                <option value="CONFORME">Conforme</option><option value="NO_CONFORME">No conforme</option>
-              </select>
-              {v.estado === 'NO_CONFORME' && (
-                <div className="fila-check-extra">
-                  <input placeholder="Qué pasa" value={v.obs} onChange={e => set({ obs: e.target.value })} />
-                  {!esDir && <label className="check"><input type="checkbox" checked={v.aviso} onChange={e => set({ aviso: e.target.checked })} /> Aviso dado en 24 h</label>}
-                </div>
-              )}
-            </div>
-          );
-        })}
+          {lineasHoja.map(l => {
+            const v = lineas[l.linea_id] ?? { estado: 'CONFORME', aviso: false, obs: '' };
+            const set = (p: Partial<typeof v>) => setLineas({ ...lineas, [l.linea_id]: { ...v, ...p } });
+            return (
+              <div className="fila-check" key={l.linea_id}>
+                <div className="fila-check-texto">{l.texto}</div>
+                <select
+                  value={v.estado}
+                  onChange={e => set({ estado: e.target.value })}
+                  className={'fila-check-estado' + (v.estado === 'NO_CONFORME' ? ' nc' : '')}
+                >
+                  <option value="CONFORME">Conforme</option>
+                  <option value="NO_CONFORME">No conforme</option>
+                </select>
+                {v.estado === 'NO_CONFORME' && (
+                  <div className="fila-check-extra">
+                    <input placeholder="Qué pasa" value={v.obs} onChange={e => set({ obs: e.target.value })} />
+                    {!esDir && (
+                      <label className="check">
+                        <input type="checkbox" checked={v.aviso} onChange={e => set({ aviso: e.target.checked })} /> Aviso dado en 24 h
+                      </label>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </fieldset>
-        {!esDir && noConformesSinAviso > 0 && <div className="aviso" style={{ marginTop: 12 }}>{noConformesSinAviso} línea(s) no conforme(s) sin aviso registrado: no serán válidas. Da el aviso y márcalo.</div>}
+        {!esDir && noConformesSinAviso > 0 && (
+          <div className="aviso" style={{ marginTop: 12 }}>
+            {noConformesSinAviso} línea(s) no conforme(s) sin aviso registrado: no serán válidas. Da el aviso y márcalo.
+          </div>
+        )}
         <div style={{ marginTop: 14, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-          <button className="btn" onClick={guardar} disabled={lineasHoja.length === 0 || bloqueada}>{existe ? 'Guardar cambios' : 'Guardar checklist'}</button>
+          <button className="btn" onClick={guardar} disabled={lineasHoja.length === 0 || bloqueada}>
+            {existe ? 'Guardar cambios' : 'Guardar checklist'}
+          </button>
           {msg && <span className={msg.tipo === 'ok' ? 'estado verde' : 'estado rojo'}>{msg.texto}</span>}
         </div>
       </section>
@@ -146,21 +267,48 @@ export function Checklist({ localId, localNombre, periodoId, catalogo, existente
         <section className="panel">
           <h3>Registrados</h3>
           <table>
-            <thead><tr><th>Semana</th><th>Hoja</th><th>Firmas</th><th className="n">No conf.</th>{!esDir && <th className="n">Sin aviso</th>}<th></th></tr></thead>
-            <tbody>{historico.map(s => (
-              <tr key={s.id}>
-                <td>{s.semana}</td><td>{s.hoja}</td>
-                <td className="small">{s.firma_manager}{s.firma_jefe_cocina ? ' · ' + s.firma_jefe_cocina : ''}</td>
-                <td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME').length}</td>
-                {!esDir && <td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME' && !l.aviso_en_24h).length}</td>}
-                <td className="acciones">
-                  <button className="btn sec peq" onClick={() => editar(s)}>{editable(s.semana) ? 'Editar' : 'Ver'}</button>
-                  <button className="btn sec peq" onClick={() => descargarPdf(docChecklist(s, catalogo, localNombre, tipo))}>PDF</button>
-                  <button className="btn sec peq" onClick={() => compartirDrive(docChecklist(s, catalogo, localNombre, tipo))}>Drive</button>
-                  {editable(s.semana) ? <button className="btn sec peq" onClick={() => borrar(s)}>Borrar</button> : <span className="small muted">cerrada</span>}
-                </td>
+            <thead>
+              <tr>
+                <th>Semana</th>
+                <th>Hoja</th>
+                <th>Firmas</th>
+                <th className="n">No conf.</th>
+                {!esDir && <th className="n">Sin aviso</th>}
+                <th></th>
               </tr>
-            ))}</tbody>
+            </thead>
+            <tbody>
+              {historico.map(s => (
+                <tr key={s.id}>
+                  <td>{s.semana}</td>
+                  <td>{s.hoja}</td>
+                  <td className="small">
+                    {s.firma_manager}
+                    {s.firma_jefe_cocina ? ' · ' + s.firma_jefe_cocina : ''}
+                  </td>
+                  <td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME').length}</td>
+                  {!esDir && <td className="n">{s.lineas.filter((l: any) => l.estado === 'NO_CONFORME' && !l.aviso_en_24h).length}</td>}
+                  <td className="acciones">
+                    <button className="btn sec peq" onClick={() => editar(s)}>
+                      {editable(s.semana) ? 'Editar' : 'Ver'}
+                    </button>
+                    <button className="btn sec peq" onClick={() => descargarPdf(docChecklist(s, catalogo, localNombre, tipo))}>
+                      PDF
+                    </button>
+                    <button className="btn sec peq" onClick={() => compartirDrive(docChecklist(s, catalogo, localNombre, tipo))}>
+                      Drive
+                    </button>
+                    {editable(s.semana) ? (
+                      <button className="btn sec peq" onClick={() => borrar(s)}>
+                        Borrar
+                      </button>
+                    ) : (
+                      <span className="small muted">cerrada</span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
           </table>
         </section>
       )}

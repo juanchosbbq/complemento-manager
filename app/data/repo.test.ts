@@ -1,6 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { abrir } from './db';
-import { borrarNeutralizacion, calcular, calcularProrrateo, cerrarLiquidacion, checklistEditablePorManager, config, datosBrutos, datosPeriodo, guardarChecklist, guardarCompromiso, guardarConfig, guardarCualitativa, guardarMes, guardarNeutralizacion, guardarNiveles, guardarVisita, hallazgosAbiertos, historial, limiteEdicionChecklist, lunesDeSemana, rangoCorte, semanaISO, vaciarDatos, validarChecklist } from './repo';
+import {
+  borrarNeutralizacion,
+  calcular,
+  calcularProrrateo,
+  cerrarLiquidacion,
+  checklistEditablePorManager,
+  config,
+  datosBrutos,
+  datosPeriodo,
+  guardarChecklist,
+  guardarCompromiso,
+  guardarConfig,
+  guardarCualitativa,
+  guardarMes,
+  guardarNeutralizacion,
+  guardarNiveles,
+  guardarVisita,
+  hallazgosAbiertos,
+  historial,
+  limiteEdicionChecklist,
+  lunesDeSemana,
+  rangoCorte,
+  semanaISO,
+  vaciarDatos,
+  validarChecklist,
+} from './repo';
 import { importarCsvUber } from '../server/integraciones/ubereats';
 
 function dbPrueba() {
@@ -8,12 +33,24 @@ function dbPrueba() {
   db.exec(`INSERT INTO locales VALUES ('L1','Local 1','Madrid',1,1,1), ('VLL','Valladolid','Valladolid',0,0,9);
            INSERT INTO periodos VALUES ('Q4-2026','Q4 2026','2026-10-01','2026-12-31','["2026-10","2026-11","2026-12"]','ABIERTO');`);
   guardarConfig(db, 'L1', 'Q4-2026', {}, 'test');
-  guardarNiveles(db, 'L1', 'Q4-2026', [{ kpi: 'K10_CHECKLIST', umbral: 80, objetivo: 95, excelencia: 100 }, { kpi: 'K11_HALLAZGOS', umbral: 60, objetivo: 85, excelencia: 100 }], 'test');
+  guardarNiveles(
+    db,
+    'L1',
+    'Q4-2026',
+    [
+      { kpi: 'K10_CHECKLIST', umbral: 80, objetivo: 95, excelencia: 100 },
+      { kpi: 'K11_HALLAZGOS', umbral: 60, objetivo: 85, excelencia: 100 },
+    ],
+    'test',
+  );
   return db;
 }
 
 describe('Semana ISO', () => {
-  it('calcula la semana', () => { expect(semanaISO('2026-10-05')).toBe('2026-W41'); expect(semanaISO('2026-12-31')).toBe('2026-W53'); });
+  it('calcula la semana', () => {
+    expect(semanaISO('2026-10-05')).toBe('2026-W41');
+    expect(semanaISO('2026-12-31')).toBe('2026-W53');
+  });
 });
 
 describe('Exclusión de Valladolid en el modelo de datos', () => {
@@ -29,11 +66,15 @@ describe('Cruce visita ↔ checklist', () => {
     const lineas = ['b1', 'b2', 'b3', 'b4'].map(id => ({ linea_id: id, estado: 'CONFORME', aviso_en_24h: false }));
     guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'B', 'Manager', 'Jefe', lineas);
     guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }]);
-    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-09', visitante: 'Dir', hallazgos: [
-      { hoja: 'B', linea_id: 'b1', reportado_previamente: 0, debio_detectarse: true },
-      { hoja: 'B', linea_id: 'b2', reportado_previamente: 1, debio_detectarse: true },
-      { hoja: 'B', linea_id: 'b3', reportado_previamente: 0, debio_detectarse: false },
-    ] });
+    guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-09',
+      visitante: 'Dir',
+      hallazgos: [
+        { hoja: 'B', linea_id: 'b1', reportado_previamente: 0, debio_detectarse: true },
+        { hoja: 'B', linea_id: 'b2', reportado_previamente: 1, debio_detectarse: true },
+        { hoja: 'B', linea_id: 'b3', reportado_previamente: 0, debio_detectarse: false },
+      ],
+    });
     const d = datosPeriodo(db, 'L1', 'Q4-2026');
     expect(d.checklist.find(l => l.lineaId === 'b1')!.hallazgoNoReportado).toBe(true);
     expect(d.checklist.find(l => l.lineaId === 'b2')!.hallazgoNoReportado).toBe(false);
@@ -49,15 +90,34 @@ describe('Cruce visita ↔ checklist', () => {
   });
   it('el cierre se registra en la visita siguiente', () => {
     const db = dbPrueba();
-    const v1 = guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-09', visitante: 'Dir', hallazgos: [{ hoja: 'A', linea_id: 'a1', reportado_previamente: 1 }, { hoja: 'A', linea_id: 'a2', reportado_previamente: 1 }] });
+    const v1 = guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-09',
+      visitante: 'Dir',
+      hallazgos: [
+        { hoja: 'A', linea_id: 'a1', reportado_previamente: 1 },
+        { hoja: 'A', linea_id: 'a2', reportado_previamente: 1 },
+      ],
+    });
     const ids = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').all(v1) as any[]).map(r => r.id);
-    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-16', visitante: 'Dir2', hallazgos: [], cierres: [{ hallazgo_id: ids[0], cerrado: true }, { hallazgo_id: ids[1], cerrado: false }] });
+    guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-16',
+      visitante: 'Dir2',
+      hallazgos: [],
+      cierres: [
+        { hallazgo_id: ids[0], cerrado: true },
+        { hallazgo_id: ids[1], cerrado: false },
+      ],
+    });
     const c = calcular(db, 'L1', 'Q4-2026');
     expect(c.agregados.valores.K11_HALLAZGOS.valor).toBe(50);
   });
   it('acumulado hasta octubre ignora lo posterior', () => {
     const db = dbPrueba();
-    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-11-09', visitante: 'Dir', hallazgos: [{ hoja: 'A', linea_id: 'a1', reportado_previamente: 0 }] });
+    guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-11-09',
+      visitante: 'Dir',
+      hallazgos: [{ hoja: 'A', linea_id: 'a1', reportado_previamente: 0 }],
+    });
     expect(datosPeriodo(db, 'L1', 'Q4-2026', '2026-10').hallazgos.length).toBe(0);
     expect(datosPeriodo(db, 'L1', 'Q4-2026').hallazgos.length).toBe(1);
   });
@@ -65,7 +125,8 @@ describe('Cruce visita ↔ checklist', () => {
 
 describe('Importación CSV de Uber Eats', () => {
   it('lee las columnas por alias y tolera porcentajes', () => {
-    const csv = 'Date,Orders,Inaccurate Orders Rate,Food Taste or Quality Issues,Order Preparation Delays,Online Rate,Unfulfilled Order Rate,Rating\n2026-10-01,1200,1.8%,0.4%,0.3%,98.2%,0.9%,4.6\n';
+    const csv =
+      'Date,Orders,Inaccurate Orders Rate,Food Taste or Quality Issues,Order Preparation Delays,Online Rate,Unfulfilled Order Rate,Rating\n2026-10-01,1200,1.8%,0.4%,0.3%,98.2%,0.9%,4.6\n';
     const r = importarCsvUber(csv);
     expect(r.columnasNoEncontradas).toEqual([]);
     expect(r.filas[0]).toMatchObject({ mes: '2026-10', pedidos: 1200, inaccurate_rate: 1.8, online_rate: 98.2, rating: 4.6 });
@@ -101,12 +162,32 @@ describe('Situaciones especiales (carta §9): prorrateo por días efectivos', ()
 describe('Cierre de hallazgos en visitas posteriores', () => {
   it('cerrar en la visita inmediata puntúa; cerrar más tarde se registra pero no puntúa', () => {
     const db = dbPrueba();
-    const v1 = guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-05', visitante: 'A', hallazgos: [{ hoja: 'A', linea_id: 'a1', reportado_previamente: 1 }, { hoja: 'A', linea_id: 'a2', reportado_previamente: 1 }] });
+    const v1 = guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-05',
+      visitante: 'A',
+      hallazgos: [
+        { hoja: 'A', linea_id: 'a1', reportado_previamente: 1 },
+        { hoja: 'A', linea_id: 'a2', reportado_previamente: 1 },
+      ],
+    });
     const [h1, h2] = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ? ORDER BY id').all(v1) as any[]).map(r => r.id);
     // visita 2: h1 cerrado, h2 sigue abierto
-    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-12', visitante: 'B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }, { hallazgo_id: h2, cerrado: false }] });
+    guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-12',
+      visitante: 'B',
+      hallazgos: [],
+      cierres: [
+        { hallazgo_id: h1, cerrado: true },
+        { hallazgo_id: h2, cerrado: false },
+      ],
+    });
     // visita 3: h2 se cierra por fin
-    guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-19', visitante: 'C', hallazgos: [], cierres: [{ hallazgo_id: h2, cerrado: true }] });
+    guardarVisita(db, 'L1', 'Q4-2026', {
+      fecha: '2026-10-19',
+      visitante: 'C',
+      hallazgos: [],
+      cierres: [{ hallazgo_id: h2, cerrado: true }],
+    });
     const rows = db.prepare('SELECT id, cerrado_en_siguiente, cerrado_fecha FROM hallazgos ORDER BY id').all() as any[];
     expect(rows[0]).toMatchObject({ cerrado_en_siguiente: 1, cerrado_fecha: '2026-10-12' });
     expect(rows[1]).toMatchObject({ cerrado_en_siguiente: 0, cerrado_fecha: '2026-10-19' });
@@ -136,7 +217,17 @@ describe('Vistas por mes y checklist de Dirección', () => {
   it('el checklist de Dirección se guarda aparte y no toca el KPI 10', () => {
     const db = dbPrueba();
     guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }]);
-    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Dirección', null, [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: false }], 'DIRECCION');
+    guardarChecklist(
+      db,
+      'L1',
+      'Q4-2026',
+      '2026-W41',
+      'A',
+      'Dirección',
+      null,
+      [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: false }],
+      'DIRECCION',
+    );
     const d = datosBrutos(db, 'L1', 'Q4-2026');
     expect(d.checklists.length).toBe(1);
     expect(d.checklistsDireccion.length).toBe(1);
@@ -165,7 +256,8 @@ describe('Cartas de objetivos precargadas', () => {
 describe('Semanas del checklist', () => {
   it('no se puede guardar una semana futura', () => {
     const db = dbPrueba();
-    const d = new Date(); d.setDate(d.getDate() + 14);
+    const d = new Date();
+    d.setDate(d.getDate() + 14);
     expect(() => guardarChecklist(db, 'L1', 'Q4-2026', semanaISO(d.toISOString().slice(0, 10)), 'A', 'M', null, [])).toThrow(/futura/);
     expect(() => guardarChecklist(db, 'L1', 'Q4-2026', 'semana 3', 'A', 'M', null, [])).toThrow(/no válida/);
   });
@@ -202,8 +294,30 @@ describe('Rastro de cambios', () => {
   const entradas = (db: ReturnType<typeof dbPrueba>, entidad: string) => historial(db, 'L1', 'Q4-2026').filter(h => h.entidad === entidad);
   it('guardar y sobrescribir un checklist deja el antes y el después', () => {
     const db = dbPrueba();
-    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }], 'MANAGER', 'Manager 1');
-    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: true }], 'MANAGER', 'Manager 1');
+    guardarChecklist(
+      db,
+      'L1',
+      'Q4-2026',
+      '2026-W41',
+      'A',
+      'Manager',
+      null,
+      [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }],
+      'MANAGER',
+      'Manager 1',
+    );
+    guardarChecklist(
+      db,
+      'L1',
+      'Q4-2026',
+      '2026-W41',
+      'A',
+      'Manager',
+      null,
+      [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: true }],
+      'MANAGER',
+      'Manager 1',
+    );
     const h = entradas(db, 'checklist');
     expect(h).toHaveLength(2);
     expect(JSON.parse(h[0].antes).lineas[0].estado).toBe('CONFORME');
@@ -223,12 +337,15 @@ describe('Rastro de cambios', () => {
     guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'x', fecha_limite: '2026-10-10' }, 'Dir');
     guardarNeutralizacion(db, 'L1', 'Q4-2026', { kpi: 'K9_DISPONIBILIDAD', motivo: 'PARADA_JUSTIFICADA' }, 'Dir');
     cerrarLiquidacion(db, 'L1', 'Q4-2026', '2027-01-10', 'Dir', true);
-    for (const e of ['niveles', 'cualitativa', 'compromiso', 'neutralizacion', 'cierre']) expect(entradas(db, e).length, e).toBeGreaterThan(0);
+    for (const e of ['niveles', 'cualitativa', 'compromiso', 'neutralizacion', 'cierre'])
+      expect(entradas(db, e).length, e).toBeGreaterThan(0);
     expect(JSON.parse(entradas(db, 'cierre')[0].despues).forzada).toBe(true);
   });
   it('borrar una neutralización solo funciona en su local y periodo, y deja rastro', () => {
     const db = dbPrueba();
-    const id = Number(guardarNeutralizacion(db, 'L1', 'Q4-2026', { kpi: 'K9_DISPONIBILIDAD', motivo: 'PARADA_JUSTIFICADA' }, 'Dir').lastInsertRowid);
+    const id = Number(
+      guardarNeutralizacion(db, 'L1', 'Q4-2026', { kpi: 'K9_DISPONIBILIDAD', motivo: 'PARADA_JUSTIFICADA' }, 'Dir').lastInsertRowid,
+    );
     expect(() => borrarNeutralizacion(db, 'L2', 'Q4-2026', id, 'Dir')).toThrow(/no encontrada/);
     borrarNeutralizacion(db, 'L1', 'Q4-2026', id, 'Dir');
     expect(entradas(db, 'neutralizacion').some(h => h.despues === null)).toBe(true);
