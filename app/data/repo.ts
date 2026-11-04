@@ -21,9 +21,10 @@ export function semanaISO(fecha: string): string {
 
 // ---------- Lectura de maestros ----------
 /** Registra el cambio de un dato para poder responder a una reclamación. Nunca falla la operación principal por esto. */
+const sinRuido = (x: any) => (x && typeof x === 'object' && !Array.isArray(x) ? Object.fromEntries(Object.entries(x).filter(([k]) => k !== 'ts' && k !== 'autor')) : x ?? null);
 function historiar(db: DB, localId: string, periodoId: string, entidad: string, clave: string, antes: any, despues: any, autor: string) {
   try {
-    if (JSON.stringify(antes ?? null) === JSON.stringify(despues ?? null)) return;
+    if (JSON.stringify(sinRuido(antes)) === JSON.stringify(sinRuido(despues))) return;
     run(db, 'INSERT INTO historial (local_id, periodo_id, entidad, clave, antes, despues, autor, ts) VALUES (?,?,?,?,?,?,?,?)',
       localId, periodoId, entidad, clave, antes ? JSON.stringify(antes) : null, despues ? JSON.stringify(despues) : null, autor, ahora());
   } catch { /* el historial no debe bloquear una escritura */ }
@@ -89,6 +90,7 @@ export function guardarConfig(db: DB, localId: string, periodoId: string, c: Row
   const v = (k: string, def: any) => (c[k] !== undefined ? c[k] : (prev[k] !== undefined && prev[k] !== null ? prev[k] : def));
   const sit = { fecha_alta: v('fecha_alta', null) || null, fecha_baja: v('fecha_baja', null) || null, dias_it: Number(v('dias_it', 0)) || 0 };
   const { prorrateo } = calcularProrrateo(p, sit);
+  const antes = get(db, 'SELECT * FROM config_periodo WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
   run(db, `INSERT INTO config_periodo (local_id, periodo_id, importe_objetivo, perfil_canal, suelo_nota_resenas, umbral_descuentos_pct, prorrateo, baja_voluntaria, fecha_alta, fecha_baja, dias_it, productos_estrategicos, fecha_comunicacion, fecha_extraccion_prevista, autor, ts)
     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(local_id, periodo_id) DO UPDATE SET
     importe_objetivo=excluded.importe_objetivo, perfil_canal=excluded.perfil_canal, suelo_nota_resenas=excluded.suelo_nota_resenas,
@@ -99,19 +101,28 @@ export function guardarConfig(db: DB, localId: string, periodoId: string, c: Row
     localId, periodoId, v('importe_objetivo', 1500), v('perfil_canal', 'MIXTO'), v('suelo_nota_resenas', 4), v('umbral_descuentos_pct', 0.3),
     prorrateo, v('baja_voluntaria', 0) ? 1 : 0, sit.fecha_alta, sit.fecha_baja, sit.dias_it,
     v('productos_estrategicos', null) || null, v('fecha_comunicacion', null) || null, v('fecha_extraccion_prevista', null) || null, autor, ahora());
+  historiar(db, localId, periodoId, 'configuracion', 'periodo', antes, get(db, 'SELECT * FROM config_periodo WHERE local_id = ? AND periodo_id = ?', localId, periodoId), autor);
 }
 
 export function guardarNiveles(db: DB, localId: string, periodoId: string, niveles: { kpi: string; umbral: number; objetivo: number; excelencia: number; llave?: number }[], autor: string) {
   const st = db.prepare(`INSERT INTO niveles (local_id, periodo_id, kpi, umbral, objetivo, excelencia, llave, autor, ts) VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id, kpi) DO UPDATE SET umbral=excluded.umbral, objetivo=excluded.objetivo, excelencia=excluded.excelencia, llave=excluded.llave, autor=excluded.autor, ts=excluded.ts`);
-  for (const n of niveles) st.run(localId, periodoId, n.kpi, n.umbral, n.objetivo, n.excelencia, n.llave ?? null, autor, ahora());
+  const fila = (kpi: string) => get(db, 'SELECT umbral, llave, objetivo, excelencia FROM niveles WHERE local_id=? AND periodo_id=? AND kpi=?', localId, periodoId, kpi);
+  for (const n of niveles) {
+    const antes = fila(n.kpi);
+    st.run(localId, periodoId, n.kpi, n.umbral, n.objetivo, n.excelencia, n.llave ?? null, autor, ahora());
+    historiar(db, localId, periodoId, 'niveles', n.kpi, antes, fila(n.kpi), autor);
+  }
 }
 
 export function guardarPuertas(db: DB, localId: string, periodoId: string, p: Row, autor: string) {
+  const leer = () => get(db, 'SELECT * FROM puertas WHERE local_id = ? AND periodo_id = ?', localId, periodoId);
+  const antes = leer();
   run(db, `INSERT INTO puertas (local_id, periodo_id, seguridad_alimentaria, reporting_semanas_en_plazo, control_caja, integridad, notas, autor, ts) VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id) DO UPDATE SET seguridad_alimentaria=excluded.seguridad_alimentaria, reporting_semanas_en_plazo=excluded.reporting_semanas_en_plazo,
     control_caja=excluded.control_caja, integridad=excluded.integridad, notas=excluded.notas, autor=excluded.autor, ts=excluded.ts`,
     localId, periodoId, p.seguridad_alimentaria ? 1 : 0, p.reporting_semanas_en_plazo ?? null, p.control_caja ? 1 : 0, p.integridad ? 1 : 0, p.notas ?? null, autor, ahora());
+  historiar(db, localId, periodoId, 'puertas', 'periodo', antes, leer(), autor);
 }
 
 // ---------- Datos ----------
@@ -151,15 +162,51 @@ export function guardarUberMes(db: DB, localId: string, periodoId: string, u: Ro
   historiar(db, localId, periodoId, 'uber', u.mes, antes, get(db, 'SELECT * FROM uber_mes WHERE local_id=? AND periodo_id=? AND mes=?', localId, periodoId, u.mes), autor);
 }
 
+// ---------- Checklist: ventana de edición del Manager ----------
+/** Días, contados desde el domingo de la semana, en que el Manager aún puede registrar, corregir o borrar ese checklist. */
+export const DIAS_EDICION_CHECKLIST = 5;
+/** Hoy en Madrid, 'YYYY-MM-DD' (el servidor corre en UTC). */
+export const hoyMadrid = () => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' });
+/** Lunes de la semana ISO 'YYYY-Www', 'YYYY-MM-DD'. */
+export function lunesDeSemana(semana: string): string {
+  const [y, w] = semana.split('-W').map(Number);
+  const ene4 = new Date(Date.UTC(y, 0, 4));
+  const d = new Date(ene4); d.setUTCDate(ene4.getUTCDate() - ((ene4.getUTCDay() || 7) - 1) + (w - 1) * 7);
+  return d.toISOString().slice(0, 10);
+}
+/** Último día (incluido) en que el Manager puede tocar el checklist de esa semana: el domingo + 5 días, es decir, el viernes siguiente. */
+export function limiteEdicionChecklist(semana: string): string {
+  const d = new Date(lunesDeSemana(semana) + 'T00:00:00Z'); d.setUTCDate(d.getUTCDate() + 6 + DIAS_EDICION_CHECKLIST);
+  return d.toISOString().slice(0, 10);
+}
+export const checklistEditablePorManager = (semana: string, hoy = hoyMadrid()) => hoy <= limiteEdicionChecklist(semana);
+
+/** Validación de lo que llega por la API: semana del periodo, hoja y líneas del catálogo, estados válidos. */
+export function validarChecklist(db: DB, periodoId: string, semana: string, hoja: string, lineas: { linea_id: string; estado: string }[] | undefined) {
+  const p = periodo(db, periodoId);
+  if (!p) throw new Error('Periodo desconocido');
+  if (!/^\d{4}-W\d{2}$/.test(String(semana))) throw new Error('Semana no válida');
+  if (semana < semanaISO(p.inicio) || semana > semanaISO(p.fin)) throw new Error(`La semana ${semana} no pertenece a ${p.nombre}`);
+  if (hoja !== 'A' && hoja !== 'B') throw new Error('Hoja no válida');
+  if (lineas === undefined) return;
+  if (!Array.isArray(lineas)) throw new Error('Líneas no válidas');
+  const validas = new Set(all(db, 'SELECT linea_id FROM lineas_catalogo WHERE hoja = ?', hoja).map(l => l.linea_id));
+  for (const l of lineas) {
+    if (!validas.has(l?.linea_id)) throw new Error(`La línea ${l?.linea_id} no está en el catálogo de la hoja ${hoja}`);
+    if (l.estado !== 'CONFORME' && l.estado !== 'NO_CONFORME') throw new Error(`Estado no válido en ${l.linea_id}`);
+  }
+}
+
 export type TipoChecklist = 'MANAGER' | 'DIRECCION';
 const tablasChecklist = (t: TipoChecklist) => t === 'DIRECCION' ? ['checklist_dir_semanas', 'checklist_dir_lineas'] : ['checklist_semanas', 'checklist_lineas'];
 
-export function guardarChecklist(db: DB, localId: string, periodoId: string, semana: string, hoja: 'A' | 'B', firmaManager: string | null, firmaJefe: string | null, lineas: { linea_id: string; estado: string; aviso_en_24h: boolean; observacion?: string }[], tipo: TipoChecklist = 'MANAGER') {
+export function guardarChecklist(db: DB, localId: string, periodoId: string, semana: string, hoja: 'A' | 'B', firmaManager: string | null, firmaJefe: string | null, lineas: { linea_id: string; estado: string; aviso_en_24h: boolean; observacion?: string }[], tipo: TipoChecklist = 'MANAGER', autor = firmaManager ?? 'desconocido') {
   const [TS, TL] = tablasChecklist(tipo);
   if (!/^\d{4}-W\d{2}$/.test(semana)) throw new Error('Semana no válida');
   if (semana > semanaISO(new Date().toISOString().slice(0, 10))) throw new Error('No se puede registrar el checklist de una semana futura');
   if (tipo === 'MANAGER' && hoja === 'B' && (!firmaManager || !firmaJefe)) throw new Error('La hoja B requiere firma del Manager y del Jefe de Cocina');
   if (!firmaManager) throw new Error(tipo === 'DIRECCION' ? 'Falta la firma de quien hace la revisión' : 'La hoja A requiere firma del Manager');
+  const antes = leerChecklist(db, TS, TL, localId, periodoId, semana, hoja);
   run(db, `INSERT INTO ${TS} (local_id, periodo_id, semana, hoja, firma_manager, firma_jefe_cocina, ts) VALUES (?,?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id, semana, hoja) DO UPDATE SET firma_manager=excluded.firma_manager, firma_jefe_cocina=excluded.firma_jefe_cocina, ts=excluded.ts`,
     localId, periodoId, semana, hoja, firmaManager, hoja === 'B' ? firmaJefe : null, ahora());
@@ -167,7 +214,13 @@ export function guardarChecklist(db: DB, localId: string, periodoId: string, sem
   run(db, `DELETE FROM ${TL} WHERE semana_id = ?`, id);
   const st = db.prepare(`INSERT INTO ${TL} (semana_id, linea_id, estado, aviso_en_24h, observacion) VALUES (?,?,?,?,?)`);
   for (const l of lineas) st.run(id, l.linea_id, l.estado, l.aviso_en_24h ? 1 : 0, l.observacion ?? null);
+  historiar(db, localId, periodoId, tipo === 'DIRECCION' ? 'checklist-direccion' : 'checklist', `${semana}/${hoja}`, antes, leerChecklist(db, TS, TL, localId, periodoId, semana, hoja), autor);
   return id;
+}
+
+function leerChecklist(db: DB, TS: string, TL: string, localId: string, periodoId: string, semana: string, hoja: string) {
+  const s = get(db, `SELECT * FROM ${TS} WHERE local_id=? AND periodo_id=? AND semana=? AND hoja=?`, localId, periodoId, semana, hoja);
+  return s ? { firma_manager: s.firma_manager, firma_jefe_cocina: s.firma_jefe_cocina, lineas: all(db, `SELECT linea_id, estado, aviso_en_24h, observacion FROM ${TL} WHERE semana_id=? ORDER BY linea_id`, s.id) } : undefined;
 }
 
 export function borrarChecklist(db: DB, localId: string, periodoId: string, semana: string, hoja: 'A' | 'B', autor: string, tipo: TipoChecklist = 'MANAGER') {
@@ -179,7 +232,7 @@ export function borrarChecklist(db: DB, localId: string, periodoId: string, sema
   run(db, `DELETE FROM ${TS} WHERE id = ?`, s.id);
 }
 
-export function guardarVisita(db: DB, localId: string, periodoId: string, v: { fecha: string; visitante: string; notas?: string; hallazgos: Row[]; cierres?: { hallazgo_id: number; cerrado: boolean }[] }) {
+export function guardarVisita(db: DB, localId: string, periodoId: string, v: { fecha: string; visitante: string; notas?: string; hallazgos: Row[]; cierres?: { hallazgo_id: number; cerrado: boolean }[] }, autor = v.visitante) {
   const r = run(db, 'INSERT INTO visitas (local_id, periodo_id, fecha, visitante, notas, ts) VALUES (?,?,?,?,?,?)', localId, periodoId, v.fecha, v.visitante, v.notas ?? null, ahora());
   const id = Number(r.lastInsertRowid);
   const st = db.prepare('INSERT INTO hallazgos (visita_id, hoja, linea_id, descripcion, reportado_previamente, debio_detectarse) VALUES (?,?,?,?,?,?)');
@@ -195,6 +248,7 @@ export function guardarVisita(db: DB, localId: string, periodoId: string, v: { f
     if (esSiguiente && h.cerrado_en_siguiente === null) run(db, 'UPDATE hallazgos SET cerrado_en_siguiente = ? WHERE id = ?', c.cerrado ? 1 : 0, c.hallazgo_id);
     if (c.cerrado && !h.cerrado_fecha) run(db, 'UPDATE hallazgos SET cerrado_fecha = ? WHERE id = ?', v.fecha, c.hallazgo_id);
   }
+  historiar(db, localId, periodoId, 'visita', String(id), null, { ...get(db, 'SELECT * FROM visitas WHERE id = ?', id), hallazgos: all(db, 'SELECT * FROM hallazgos WHERE visita_id = ?', id), cierres: v.cierres ?? [] }, autor);
   return id;
 }
 
@@ -248,40 +302,80 @@ function validarNota(v: any, etiqueta: string) {
   if (Number(v) < 1 || Number(v) > 10) throw new Error(`${etiqueta} debe estar entre 1 y 10 — has puesto ${v}`);
 }
 
-export const guardarFicha = (db: DB, localId: string, periodoId: string, f: Row) =>
-  validarNota(f.sala, 'La nota de sala') ?? validarNota(f.producto, 'La nota de producto') ?? run(db, 'INSERT INTO fichas_misterioso (local_id, periodo_id, fecha, evaluador, sala, producto, detalle, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, f.fecha, f.evaluador, f.sala, f.producto ?? null, f.detalle ?? null, ahora());
+export function guardarFicha(db: DB, localId: string, periodoId: string, f: Row, autor = f.evaluador) {
+  validarNota(f.sala, 'La nota de sala'); validarNota(f.producto, 'La nota de producto');
+  const r = run(db, 'INSERT INTO fichas_misterioso (local_id, periodo_id, fecha, evaluador, sala, producto, detalle, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, f.fecha, f.evaluador, f.sala, f.producto ?? null, f.detalle ?? null, ahora());
+  historiar(db, localId, periodoId, 'ficha', String(r.lastInsertRowid), null, get(db, 'SELECT * FROM fichas_misterioso WHERE id = ?', r.lastInsertRowid), autor);
+  return r;
+}
 
-export const guardarCompromiso = (db: DB, localId: string, periodoId: string, c: Row, autor: string) =>
-  c.id ? run(db, 'UPDATE compromisos SET descripcion=?, fecha_limite=?, fecha_cumplido=?, autor=?, ts=? WHERE id=?', c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora(), c.id)
-       : run(db, 'INSERT INTO compromisos (local_id, periodo_id, tipo, descripcion, fecha_limite, fecha_cumplido, autor, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, c.tipo, c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora());
+const leerCompromiso = (db: DB, localId: string, periodoId: string, id: any) => get(db, 'SELECT * FROM compromisos WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
 
-export const borrarCompromiso = (db: DB, localId: string, periodoId: string, id: number) =>
-  run(db, 'DELETE FROM compromisos WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
+export function guardarCompromiso(db: DB, localId: string, periodoId: string, c: Row, autor: string) {
+  if (c.id) {
+    const antes = leerCompromiso(db, localId, periodoId, c.id);
+    if (!antes) throw new Error('Compromiso no encontrado');
+    const r = run(db, 'UPDATE compromisos SET descripcion=?, fecha_limite=?, fecha_cumplido=?, autor=?, ts=? WHERE id=?', c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora(), c.id);
+    historiar(db, localId, periodoId, 'compromiso', String(c.id), antes, leerCompromiso(db, localId, periodoId, c.id), autor);
+    return r;
+  }
+  const r = run(db, 'INSERT INTO compromisos (local_id, periodo_id, tipo, descripcion, fecha_limite, fecha_cumplido, autor, ts) VALUES (?,?,?,?,?,?,?,?)', localId, periodoId, c.tipo, c.descripcion, c.fecha_limite, c.fecha_cumplido ?? null, autor, ahora());
+  historiar(db, localId, periodoId, 'compromiso', String(r.lastInsertRowid), null, leerCompromiso(db, localId, periodoId, r.lastInsertRowid), autor);
+  return r;
+}
+
+export function borrarCompromiso(db: DB, localId: string, periodoId: string, id: number, autor = 'desconocido') {
+  const antes = leerCompromiso(db, localId, periodoId, id);
+  if (!antes) throw new Error('Compromiso no encontrado');
+  historiar(db, localId, periodoId, 'compromiso', String(id), antes, null, autor);
+  return run(db, 'DELETE FROM compromisos WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
+}
 
 export const guardarCualitativa = (db: DB, localId: string, periodoId: string, q: Row, evaluador: string) => {
   const nota = q.nota === null || q.nota === undefined || q.nota === '' ? null : Number(q.nota);
   if (nota !== null && (nota < 1 || nota > 10)) throw new Error('La nota debe estar entre 1 y 10');
   if (nota !== null && !String(q.justificacion ?? '').trim()) throw new Error('La valoración necesita una justificación escrita');
-  return run(db, `INSERT INTO cualitativa (local_id, periodo_id, nota, justificacion, evaluador, ts) VALUES (?,?,?,?,?,?)
+  const leer = () => get(db, 'SELECT nota, justificacion, evaluador FROM cualitativa WHERE local_id=? AND periodo_id=?', localId, periodoId);
+  const antes = leer();
+  const r = run(db, `INSERT INTO cualitativa (local_id, periodo_id, nota, justificacion, evaluador, ts) VALUES (?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id) DO UPDATE SET nota=excluded.nota, justificacion=excluded.justificacion, evaluador=excluded.evaluador, ts=excluded.ts`,
     localId, periodoId, nota === null ? null : Math.round(nota * 10) / 10, q.justificacion ?? null, evaluador, ahora());
+  historiar(db, localId, periodoId, 'cualitativa', 'periodo', antes, leer(), evaluador);
+  return r;
 };
 
-export const guardarDescuentosMes = (db: DB, localId: string, periodoId: string, d: Row, autor: string) =>
+export function guardarDescuentosMes(db: DB, localId: string, periodoId: string, d: Row, autor: string) {
+  const leer = () => get(db, 'SELECT * FROM descuentos_mes WHERE local_id=? AND periodo_id=? AND mes=?', localId, periodoId, d.mes);
+  const antes = leer();
   run(db, `INSERT INTO descuentos_mes (local_id, periodo_id, mes, ventas, no_tipificados, cauce_disciplinario_abierto, autor, ts) VALUES (?,?,?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id, mes) DO UPDATE SET ventas=excluded.ventas, no_tipificados=excluded.no_tipificados, cauce_disciplinario_abierto=excluded.cauce_disciplinario_abierto, autor=excluded.autor, ts=excluded.ts`,
     localId, periodoId, d.mes, d.ventas, d.no_tipificados ?? 0, d.cauce_disciplinario_abierto ? 1 : 0, autor, ahora());
+  historiar(db, localId, periodoId, 'descuentos', String(d.mes), antes, leer(), autor);
+}
 
-export const guardarCostePersonalMes = (db: DB, localId: string, periodoId: string, c: Row, autor: string) =>
+export function guardarCostePersonalMes(db: DB, localId: string, periodoId: string, c: Row, autor: string) {
+  const leer = () => get(db, 'SELECT * FROM coste_personal_mes WHERE local_id=? AND periodo_id=? AND mes=?', localId, periodoId, c.mes);
+  const antes = leer();
   run(db, `INSERT INTO coste_personal_mes (local_id, periodo_id, mes, coste_sala, ventas, horas_sala, origen, autor, ts) VALUES (?,?,?,?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id, mes) DO UPDATE SET coste_sala=excluded.coste_sala, ventas=excluded.ventas, horas_sala=excluded.horas_sala, origen=excluded.origen, autor=excluded.autor, ts=excluded.ts`,
     localId, periodoId, c.mes, c.coste_sala ?? null, c.ventas ?? null, c.horas_sala ?? null, c.origen ?? 'manual', autor, ahora());
+  historiar(db, localId, periodoId, 'coste-personal', String(c.mes), antes, leer(), autor);
+}
 
-export const guardarNeutralizacion = (db: DB, localId: string, periodoId: string, n: Row, aprobadoPor: string) => {
+const leerNeutralizacion = (db: DB, localId: string, periodoId: string, id: any) => get(db, 'SELECT * FROM neutralizaciones WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
+export function guardarNeutralizacion(db: DB, localId: string, periodoId: string, n: Row, aprobadoPor: string) {
   if (!KPIS.some(k => k.id === n.kpi)) throw new Error('KPI desconocido');
-  return run(db, 'INSERT INTO neutralizaciones (local_id, periodo_id, kpi, motivo, evidencia, aprobado_por, ts) VALUES (?,?,?,?,?,?,?)', localId, periodoId, n.kpi, n.motivo, n.evidencia ?? null, aprobadoPor, ahora());
-};
-export const borrarNeutralizacion = (db: DB, id: number) => run(db, 'DELETE FROM neutralizaciones WHERE id = ?', id);
+  const r = run(db, 'INSERT INTO neutralizaciones (local_id, periodo_id, kpi, motivo, evidencia, aprobado_por, ts) VALUES (?,?,?,?,?,?,?)', localId, periodoId, n.kpi, n.motivo, n.evidencia ?? null, aprobadoPor, ahora());
+  historiar(db, localId, periodoId, 'neutralizacion', String(r.lastInsertRowid), null, leerNeutralizacion(db, localId, periodoId, r.lastInsertRowid), aprobadoPor);
+  return r;
+}
+/** Solo borra la neutralización si es de este local y periodo. */
+export function borrarNeutralizacion(db: DB, localId: string, periodoId: string, id: number, autor = 'desconocido') {
+  const antes = leerNeutralizacion(db, localId, periodoId, id);
+  if (!antes) throw new Error('Neutralización no encontrada');
+  historiar(db, localId, periodoId, 'neutralizacion', String(id), antes, null, autor);
+  return run(db, 'DELETE FROM neutralizaciones WHERE id = ? AND local_id = ? AND periodo_id = ?', id, localId, periodoId);
+}
 
 // ---------- Lectura para cálculo ----------
 /** Construye DatosPeriodo de un local. `hastaMes` limita al acumulado a fecha (scorecard mensual). */
@@ -419,18 +513,27 @@ export function cerrarLiquidacion(db: DB, localId: string, periodoId: string, fe
   const c = calcular(db, localId, periodoId, 'T', true);
   const faltan = c.resultado.kpis.filter(k => k.pendiente && k.pesoEfectivo > 0);
   if (faltan.length && !forzar) throw new Error(`Faltan datos de ${faltan.length} indicador(es): ${faltan.map(k => k.nombre).join(', ')}. Cárgalos antes de cerrar, o cierra forzando si de verdad deben computar 0.`);
+  const prev = liquidacionCerrada(db, localId, periodoId);
+  const resumen = (l: Row | null, forzada?: boolean) => l && ({
+    fecha_extraccion: l.fecha_extraccion, cerrada_por: l.cerrada_por, pago: l.resultado.pago, logro: l.resultado.logroPonderado,
+    llaves: l.resultado.llavesCumplidas, puertas: l.resultado.puertas.superadas, ...(forzada ? { forzada: true, indicadores_a_cero: faltan.map(k => k.nombre) } : {}),
+  });
   run(db, `INSERT INTO liquidaciones (local_id, periodo_id, fecha_extraccion, resultado, cerrada_por, ts) VALUES (?,?,?,?,?,?)
     ON CONFLICT(local_id, periodo_id) DO UPDATE SET fecha_extraccion=excluded.fecha_extraccion, resultado=excluded.resultado, cerrada_por=excluded.cerrada_por, ts=excluded.ts`,
     localId, periodoId, fechaExtraccion, JSON.stringify(c.resultado), cerradaPor, ahora());
+  historiar(db, localId, periodoId, 'cierre', periodoId, resumen(prev), resumen({ fecha_extraccion: fechaExtraccion, cerrada_por: cerradaPor, resultado: c.resultado }, faltan.length > 0), cerradaPor);
   return c;
 }
+const resumenLiquidacion = (l: Row | null) => l && { fecha_extraccion: l.fecha_extraccion, cerrada_por: l.cerrada_por, pago: l.resultado.pago };
 export const liquidacionCerrada = (db: DB, localId: string, periodoId: string) => {
   const r = get(db, 'SELECT * FROM liquidaciones WHERE local_id=? AND periodo_id=?', localId, periodoId);
   return r ? { ...r, resultado: JSON.parse(r.resultado) } : null;
 };
 
 /** Borra los datos operativos de un local en un periodo (meses, Uber, checklists, visitas, fichas, compromisos, cualitativa, neutralizaciones, cierres). Conserva configuración, niveles y puertas. */
-export function vaciarDatos(db: DB, localId: string, periodoId: string) {
+export function vaciarDatos(db: DB, localId: string, periodoId: string, autor = 'desconocido') {
+  // El historial NO se vacía: queda constancia del vaciado y de lo que había antes en cada entrada anterior.
+  historiar(db, localId, periodoId, 'vaciado', periodoId, { liquidacion: resumenLiquidacion(liquidacionCerrada(db, localId, periodoId)) }, { vaciado: true }, autor);
   for (const t of ['meses', 'uber_mes', 'fichas_misterioso', 'compromisos', 'cualitativa', 'descuentos_mes', 'coste_personal_mes', 'neutralizaciones', 'liquidaciones'])
     run(db, `DELETE FROM ${t} WHERE local_id = ? AND periodo_id = ?`, localId, periodoId);
   run(db, 'DELETE FROM hallazgos WHERE visita_id IN (SELECT id FROM visitas WHERE local_id = ? AND periodo_id = ?)', localId, periodoId);
@@ -465,8 +568,6 @@ export function estadoCarga(db: DB, periodoId: string) {
     return { local: l, meses, semanas, visitas, fichas, cualitativa: q?.nota ?? null };
   });
 }
-
-export const acceso = (db: DB, token: string) => get(db, 'SELECT * FROM accesos WHERE token = ? AND activo = 1', token);
 
 /** Datos brutos de un local/periodo para la vista de entrada. */
 export function datosBrutos(db: DB, localId: string, periodoId: string) {

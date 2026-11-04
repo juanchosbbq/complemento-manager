@@ -3,6 +3,7 @@ import { api, eur, getToken, nombreMes, num, post, setToken } from './api';
 import { Detalle } from './Detalle';
 import { Checklist } from './Checklist';
 import { Entrada } from './Entrada';
+import { compartirDrive, descargarPdf, docLiquidacion } from './pdf';
 
 type Yo = { rol: 'DIRECCION' | 'MANAGER'; local_id: string | null; nombre: string; email: string; debe_cambiar?: boolean };
 
@@ -282,15 +283,15 @@ function Local({ yo, localId, periodo, hasta, modelo, catalogo, locales, volver 
       {ilustrativo && <div className="aviso">Este local tiene datos o umbrales marcados como ilustrativos (sembrado de ejemplo). No son cifras de la empresa: sustitúyelos por los de la carta de objetivos y los reales.</div>}
       {err && <div className="error">{err}{yo.rol === 'DIRECCION' && ' — completa la configuración en «Cargar datos y configurar».'}</div>}
       {vista === 'seguimiento' && calc && <Detalle calc={calc} modelo={modelo} rol={yo.rol} />}
-      {vista === 'checklist' && datos && <Checklist key="m" periodoInicio={periodo.inicio} localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
+      {vista === 'checklist' && datos && <Checklist key="m" rol={yo.rol} diasEdicion={modelo?.diasEdicionChecklist ?? 5} periodoInicio={periodo.inicio} localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklists} nombre={yo.nombre} onGuardado={cargar} />}
       {vista === 'checklist-dir' && datos && yo.rol === 'DIRECCION' && <Checklist key="d" tipo="DIRECCION" periodoInicio={periodo.inicio} localId={localId} localNombre={local?.nombre ?? localId} periodoId={periodo.id} catalogo={catalogo} existentes={datos.checklistsDireccion ?? []} nombre={yo.nombre} onGuardado={cargar} />}
       {vista === 'datos' && datos && yo.rol === 'DIRECCION' && <Entrada localId={localId} periodoId={periodo.id} meses={periodo.meses} datos={datos} modelo={modelo} catalogo={catalogo} nombre={yo.nombre} onCambio={cargar} />}
-      {vista === 'cierre' && datos && yo.rol === 'DIRECCION' && <Cierre localId={localId} periodoId={periodo.id} datos={datos} onCambio={cargar} />}
+      {vista === 'cierre' && datos && yo.rol === 'DIRECCION' && <Cierre localId={localId} periodoId={periodo.id} periodoNombre={periodo.nombre} localNombre={local?.nombre ?? localId} kpis={modelo?.kpis ?? []} datos={datos} onCambio={cargar} />}
     </>
   );
 }
 
-function Cierre({ localId, periodoId, datos, onCambio }: { localId: string; periodoId: string; datos: any; onCambio: () => void }) {
+function Cierre({ localId, periodoId, periodoNombre, localNombre, kpis, datos, onCambio }: { localId: string; periodoId: string; periodoNombre: string; localNombre: string; kpis: any[]; datos: any; onCambio: () => void }) {
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [msg, setMsg] = useState('');
   const liq = datos.liquidacion;
@@ -299,6 +300,12 @@ function Cierre({ localId, periodoId, datos, onCambio }: { localId: string; peri
       <h2>Cierre del trimestre</h2>
       <p className="small muted">T+15: extracción con fecha documentada, neutralizaciones y cálculo definitivo. El cierre guarda una foto del resultado con la fecha de extracción; lo que se pague sale de esa foto, no del cálculo en vivo. Se puede repetir si hay reclamación estimada.</p>
       {liq && <div className="ok">Liquidación cerrada el {liq.ts.slice(0, 10)} por {liq.cerrada_por} con extracción del {liq.fecha_extraccion}: <strong>{eur(liq.resultado.pago)}</strong> ({num(liq.resultado.logroPonderado)} % · {liq.resultado.llavesCumplidas} de 4 llaves).</div>}
+      {liq && (
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', margin: '10px 0 14px' }}>
+          <button className="btn sec" onClick={() => descargarPdf(docLiquidacion(liq, localNombre, periodoNombre, kpis))}>Descargar PDF del cierre</button>
+          <button className="btn sec" onClick={() => compartirDrive(docLiquidacion(liq, localNombre, periodoNombre, kpis))}>Drive</button>
+        </div>
+      )}
       <div className="form">
         <label>Fecha de extracción de datos<input type="date" value={fecha} onChange={e => setFecha(e.target.value)} /></label>
         <div><button className="btn" onClick={async () => { try { const r = await post(`liquidar/${localId}/${periodoId}`, { fecha_extraccion: fecha }); setMsg(`Cerrado: ${eur(r.resultado.pago)}.`); onCambio(); } catch (e: any) { setMsg(e.message); if (/Faltan datos/.test(e.message) && confirm(`${e.message}\n\n¿Cerrar de todas formas, con esos indicadores a 0?`)) { try { const r = await post(`liquidar/${localId}/${periodoId}`, { fecha_extraccion: fecha, forzar: true }); setMsg(`Cerrado forzando: ${eur(r.resultado.pago)}.`); onCambio(); } catch (e2: any) { setMsg(e2.message); } } } }}>{liq ? 'Volver a cerrar (sustituye la foto)' : 'Cerrar liquidación'}</button></div>

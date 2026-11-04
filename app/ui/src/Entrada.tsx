@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api, nombreMes, post } from './api';
+import { api, getToken, nombreMes, post } from './api';
 import { compartirDrive, descargarPdf, docVisita } from './pdf';
 
 type Props = { localId: string; periodoId: string; meses: string[]; datos: any; modelo: any; catalogo: any[]; nombre: string; onCambio: () => void };
@@ -19,7 +19,7 @@ const n = (v: string) => (v === '' ? null : Number(v));
 
 export function Entrada(p: Props) {
   const [tab, setTab] = useState('ventas');
-  const tabs: [string, string][] = [['ventas', 'Ventas y reseñas'], ['uber', 'Uber Eats'], ['visita', 'Hallazgos Visitas'], ['ficha', 'Cliente misterioso'], ['direccion', 'Dirección'], ['puertas', 'Puertas y situaciones especiales'], ['config', 'Configuración']];
+  const tabs: [string, string][] = [['ventas', 'Ventas y reseñas'], ['uber', 'Uber Eats'], ['visita', 'Hallazgos Visitas'], ['ficha', 'Cliente misterioso'], ['direccion', 'Dirección'], ['puertas', 'Puertas y situaciones especiales'], ['config', 'Configuración'], ['historial', 'Historial y copia']];
   return (
     <>
       <div className="pestanas">{tabs.map(([k, t]) => <button key={k} className={tab === k ? 'activa' : ''} onClick={() => setTab(k)}>{t}</button>)}</div>
@@ -30,6 +30,7 @@ export function Entrada(p: Props) {
       {tab === 'direccion' && <Direccion {...p} />}
       {tab === 'puertas' && <Puertas {...p} />}
       {tab === 'config' && <Config {...p} />}
+      {tab === 'historial' && <Historial {...p} />}
     </>
   );
 }
@@ -314,5 +315,82 @@ function Config({ localId, periodoId, datos, modelo, onCambio }: Props) {
       <p className="small muted">Borra meses, Uber, checklists, visitas, fichas, compromisos, valoración, neutralizaciones y cierre de este local en este periodo. Conserva la configuración y los umbrales. Sirve para quitar los datos de ejemplo del sembrado antes de empezar de verdad.</p>
       <button className="btn sec" onClick={() => { const t = prompt(`Escribe ${localId} para confirmar el borrado de los datos de ${periodoId}`); if (t === localId) enviar(`vaciar/${localId}/${periodoId}`, { confirmar: t }, 'Datos vaciados.'); }}>Vaciar datos operativos…</button>
     </section>
+  );
+}
+
+// ---------- Historial de cambios y copia de seguridad ----------
+const ENTIDADES: Record<string, string> = {
+  mes: 'Ventas y reseñas', uber: 'Uber Eats', checklist: 'Checklist del Manager', 'checklist-direccion': 'Checklist de Dirección',
+  visita: 'Visita', hallazgo: 'Hallazgo', ficha: 'Cliente misterioso', compromiso: 'Compromiso', cualitativa: 'Valoración cualitativa',
+  descuentos: 'Descuentos', 'coste-personal': 'Coste de personal', neutralizacion: 'Neutralización', cierre: 'Cierre del trimestre',
+  vaciado: 'Vaciado de datos', configuracion: 'Configuración', niveles: 'Umbrales', puertas: 'Puertas',
+};
+const corto = (v: any) => { const t = v === null || v === undefined ? '—' : typeof v === 'object' ? JSON.stringify(v) : String(v); return t.length > 70 ? t.slice(0, 67) + '…' : t; };
+const OCULTOS = new Set(['ts', 'autor', 'local_id', 'periodo_id', 'id', 'semana_id']);
+
+/** Qué cambió entre dos versiones de un dato, campo a campo. */
+function cambios(antesTxt: string | null, despuesTxt: string | null): string[] {
+  const antes = antesTxt ? JSON.parse(antesTxt) : null; const despues = despuesTxt ? JSON.parse(despuesTxt) : null;
+  if (!antes && !despues) return [];
+  if (!antes) return ['alta'];
+  if (!despues) return ['borrado'];
+  if (Array.isArray(antes.lineas) && Array.isArray(despues.lineas)) {
+    const clave = (l: any) => `${l.estado}|${l.aviso_en_24h}|${l.observacion ?? ''}`;
+    const prev = new Map(antes.lineas.map((l: any) => [l.linea_id, l]));
+    const dif = despues.lineas.filter((l: any) => { const a: any = prev.get(l.linea_id); return !a || clave(a) !== clave(l); })
+      .map((l: any) => { const a: any = prev.get(l.linea_id); return `${l.linea_id}: ${a ? `${a.estado}${a.aviso_en_24h ? ' con aviso' : ''}` : '—'} → ${l.estado}${l.aviso_en_24h ? ' con aviso' : ''}`; });
+    const firmas = ['firma_manager', 'firma_jefe_cocina'].filter(k => antes[k] !== despues[k]).map(k => `${k}: ${corto(antes[k])} → ${corto(despues[k])}`);
+    return [...firmas, ...dif];
+  }
+  const claves = [...new Set([...Object.keys(antes), ...Object.keys(despues)])].filter(k => !OCULTOS.has(k));
+  return claves.filter(k => JSON.stringify(antes[k]) !== JSON.stringify(despues[k])).map(k => `${k}: ${corto(antes[k])} → ${corto(despues[k])}`);
+}
+
+async function descargarCopia(): Promise<void> {
+  const r = await fetch('/api/copia', { headers: { 'X-Token': getToken() } });
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error ?? r.statusText);
+  const nombre = /filename="([^"]+)"/.exec(r.headers.get('Content-Disposition') ?? '')?.[1] ?? 'incentivos.db';
+  const url = URL.createObjectURL(await r.blob()); const a = document.createElement('a');
+  a.href = url; a.download = nombre; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+
+function Historial({ datos }: Props) {
+  const [filtro, setFiltro] = useState('');
+  const [msg, setMsg] = useState('');
+  const filas: any[] = (datos.historial ?? []).filter((h: any) => !filtro || h.entidad === filtro);
+  const presentes: string[] = [...new Set<string>((datos.historial ?? []).map((h: any) => String(h.entidad)))];
+  return (
+    <>
+      <section className="panel">
+        <h2>Copia de seguridad</h2>
+        <p className="small muted">Descarga la base de datos completa (todos los locales y periodos, con su historial) en un único fichero. Guárdala en un sitio seguro: contiene los datos de todos los usuarios. Conviene hacerlo al menos al cerrar cada mes y siempre después del cierre del trimestre.</p>
+        <button className="btn sec" onClick={() => { setMsg(''); descargarCopia().then(() => setMsg('Copia descargada.')).catch(e => setMsg(e.message)); }}>Descargar copia de la base de datos</button>
+        {msg && <span className="small" style={{ marginLeft: 10 }}>{msg}</span>}
+      </section>
+      <section className="panel">
+        <h2>Historial de cambios</h2>
+        <p className="small muted">Cada alta, cambio o borrado de un dato de este local y periodo, con quién lo hizo y cuándo. Sirve para responder a una reclamación. Se muestran los 300 más recientes; la copia de seguridad los contiene todos.</p>
+        <div className="form" style={{ marginBottom: 12 }}>
+          <label>Mostrar<select value={filtro} onChange={e => setFiltro(e.target.value)}>
+            <option value="">Todo</option>
+            {presentes.map(e => <option key={e} value={e}>{ENTIDADES[e] ?? e}</option>)}
+          </select></label>
+        </div>
+        {filas.length === 0 ? <p className="muted">Sin cambios registrados.</p> : (
+          <table>
+            <thead><tr><th>Cuándo</th><th>Quién</th><th>Qué</th><th>Cambio</th></tr></thead>
+            <tbody>{filas.map(h => (
+              <tr key={h.id}>
+                <td className="small">{String(h.ts).slice(0, 16).replace('T', ' ')}</td>
+                <td className="small">{h.autor}</td>
+                <td className="small">{ENTIDADES[h.entidad] ?? h.entidad} · {h.clave}</td>
+                <td className="small">{cambios(h.antes, h.despues).map((c, i) => <div key={i}>{c}</div>)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        )}
+      </section>
+    </>
   );
 }

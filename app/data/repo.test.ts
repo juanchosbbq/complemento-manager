@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { abrir } from './db';
-import { calcular, calcularProrrateo, config, datosBrutos, datosPeriodo, guardarChecklist, guardarConfig, guardarMes, guardarNiveles, guardarVisita, hallazgosAbiertos, rangoCorte, semanaISO } from './repo';
+import { borrarNeutralizacion, calcular, calcularProrrateo, cerrarLiquidacion, checklistEditablePorManager, config, datosBrutos, datosPeriodo, guardarChecklist, guardarCompromiso, guardarConfig, guardarCualitativa, guardarMes, guardarNeutralizacion, guardarNiveles, guardarVisita, hallazgosAbiertos, historial, limiteEdicionChecklist, lunesDeSemana, rangoCorte, semanaISO, vaciarDatos, validarChecklist } from './repo';
 import { importarCsvUber } from '../server/integraciones/ubereats';
 
 function dbPrueba() {
@@ -168,5 +168,76 @@ describe('Semanas del checklist', () => {
     const d = new Date(); d.setDate(d.getDate() + 14);
     expect(() => guardarChecklist(db, 'L1', 'Q4-2026', semanaISO(d.toISOString().slice(0, 10)), 'A', 'M', null, [])).toThrow(/futura/);
     expect(() => guardarChecklist(db, 'L1', 'Q4-2026', 'semana 3', 'A', 'M', null, [])).toThrow(/no válida/);
+  });
+});
+
+describe('Ventana de edición del checklist del Manager (5 días tras el domingo)', () => {
+  it('la semana 45 de 2026 (2–8 nov) se puede tocar hasta el viernes 13 incluido', () => {
+    expect(lunesDeSemana('2026-W45')).toBe('2026-11-02');
+    expect(limiteEdicionChecklist('2026-W45')).toBe('2026-11-13');
+    expect(checklistEditablePorManager('2026-W45', '2026-11-13')).toBe(true);
+    expect(checklistEditablePorManager('2026-W45', '2026-11-14')).toBe(false);
+  });
+  it('funciona en el cambio de año ISO', () => {
+    expect(lunesDeSemana('2026-W53')).toBe('2026-12-28');
+    expect(limiteEdicionChecklist('2026-W53')).toBe('2027-01-08');
+  });
+});
+
+describe('Validación del checklist que llega por la API', () => {
+  const db = dbPrueba();
+  db.exec("INSERT INTO lineas_catalogo VALUES ('A','A_clima','Climatización',1), ('B','B_parrilla','Parrilla',1)");
+  it('acepta líneas del catálogo de su hoja', () => {
+    expect(() => validarChecklist(db, 'Q4-2026', '2026-W41', 'A', [{ linea_id: 'A_clima', estado: 'CONFORME' }])).not.toThrow();
+  });
+  it('rechaza líneas de otra hoja o inventadas, estados raros y semanas fuera del periodo', () => {
+    expect(() => validarChecklist(db, 'Q4-2026', '2026-W41', 'A', [{ linea_id: 'B_parrilla', estado: 'CONFORME' }])).toThrow(/catálogo/);
+    expect(() => validarChecklist(db, 'Q4-2026', '2026-W41', 'A', [{ linea_id: 'A_clima', estado: 'REGULAR' }])).toThrow(/Estado/);
+    expect(() => validarChecklist(db, 'Q4-2026', '2026-W30', 'A', [])).toThrow(/no pertenece/);
+    expect(() => validarChecklist(db, 'Q4-2026', '2026-W41', 'C', [])).toThrow(/Hoja/);
+  });
+});
+
+describe('Rastro de cambios', () => {
+  const entradas = (db: ReturnType<typeof dbPrueba>, entidad: string) => historial(db, 'L1', 'Q4-2026').filter(h => h.entidad === entidad);
+  it('guardar y sobrescribir un checklist deja el antes y el después', () => {
+    const db = dbPrueba();
+    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'CONFORME', aviso_en_24h: false }], 'MANAGER', 'Manager 1');
+    guardarChecklist(db, 'L1', 'Q4-2026', '2026-W41', 'A', 'Manager', null, [{ linea_id: 'a1', estado: 'NO_CONFORME', aviso_en_24h: true }], 'MANAGER', 'Manager 1');
+    const h = entradas(db, 'checklist');
+    expect(h).toHaveLength(2);
+    expect(JSON.parse(h[0].antes).lineas[0].estado).toBe('CONFORME');
+    expect(JSON.parse(h[0].despues).lineas[0].estado).toBe('NO_CONFORME');
+    expect(h[0].autor).toBe('Manager 1');
+  });
+  it('guardar lo mismo otra vez no ensucia el historial', () => {
+    const db = dbPrueba();
+    guardarConfig(db, 'L1', 'Q4-2026', { importe_objetivo: 2000 }, 'Dir');
+    guardarConfig(db, 'L1', 'Q4-2026', { importe_objetivo: 2000 }, 'Dir');
+    expect(entradas(db, 'configuracion')).toHaveLength(2); // el alta de dbPrueba y el cambio a 2000; el repetido no cuenta
+  });
+  it('niveles, cualitativa, compromisos, neutralizaciones y cierre quedan registrados', () => {
+    const db = dbPrueba();
+    guardarNiveles(db, 'L1', 'Q4-2026', [{ kpi: 'K10_CHECKLIST', umbral: 70, objetivo: 95, excelencia: 100 }], 'Dir');
+    guardarCualitativa(db, 'L1', 'Q4-2026', { nota: 7.5, justificacion: 'Bien' }, 'Dir');
+    guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'x', fecha_limite: '2026-10-10' }, 'Dir');
+    guardarNeutralizacion(db, 'L1', 'Q4-2026', { kpi: 'K9_DISPONIBILIDAD', motivo: 'PARADA_JUSTIFICADA' }, 'Dir');
+    cerrarLiquidacion(db, 'L1', 'Q4-2026', '2027-01-10', 'Dir', true);
+    for (const e of ['niveles', 'cualitativa', 'compromiso', 'neutralizacion', 'cierre']) expect(entradas(db, e).length, e).toBeGreaterThan(0);
+    expect(JSON.parse(entradas(db, 'cierre')[0].despues).forzada).toBe(true);
+  });
+  it('borrar una neutralización solo funciona en su local y periodo, y deja rastro', () => {
+    const db = dbPrueba();
+    const id = Number(guardarNeutralizacion(db, 'L1', 'Q4-2026', { kpi: 'K9_DISPONIBILIDAD', motivo: 'PARADA_JUSTIFICADA' }, 'Dir').lastInsertRowid);
+    expect(() => borrarNeutralizacion(db, 'L2', 'Q4-2026', id, 'Dir')).toThrow(/no encontrada/);
+    borrarNeutralizacion(db, 'L1', 'Q4-2026', id, 'Dir');
+    expect(entradas(db, 'neutralizacion').some(h => h.despues === null)).toBe(true);
+  });
+  it('vaciar los datos conserva el historial y registra el vaciado', () => {
+    const db = dbPrueba();
+    guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 1000 }, 'Dir');
+    vaciarDatos(db, 'L1', 'Q4-2026', 'Dir');
+    expect(entradas(db, 'mes')).toHaveLength(1);
+    expect(entradas(db, 'vaciado')).toHaveLength(1);
   });
 });
