@@ -150,6 +150,10 @@ CREATE TABLE IF NOT EXISTS liquidaciones (
   local_id TEXT NOT NULL, periodo_id TEXT NOT NULL, fecha_extraccion TEXT NOT NULL,
   resultado TEXT NOT NULL, cerrada_por TEXT NOT NULL, ts TEXT NOT NULL, PRIMARY KEY (local_id, periodo_id)
 );
+-- Registro de las copias de seguridad enviadas a Google Drive (bien o mal).
+CREATE TABLE IF NOT EXISTS copias_drive (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, ts TEXT NOT NULL, motivo TEXT NOT NULL, nombre TEXT, ok INTEGER NOT NULL, detalle TEXT, autor TEXT
+);
 -- Rastro de cambios: en un sistema que decide dinero, hay que poder decir qué valía un dato antes.
 CREATE TABLE IF NOT EXISTS historial (
   id INTEGER PRIMARY KEY AUTOINCREMENT, local_id TEXT NOT NULL, periodo_id TEXT NOT NULL,

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { api, getToken, nombreMes, post } from './api';
 import { compartirDrive, descargarPdf, docVisita } from './pdf';
 
@@ -1238,6 +1238,89 @@ async function descargarCopia(): Promise<void> {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+const MOTIVO_COPIA: Record<string, string> = { diaria: 'Diaria', cierre: 'Cierre', manual: 'Manual' };
+
+/** Estado de las copias automáticas a Google Drive, con botón para hacer una ahora. */
+function CopiasDrive() {
+  const [estado, setEstado] = useState<any>(null);
+  const [ocupado, setOcupado] = useState(false);
+  const [msg, setMsg] = useState<{ tipo: 'ok' | 'error'; texto: string } | null>(null);
+  const cargar = () =>
+    api('copia-drive')
+      .then(setEstado)
+      .catch(e => setMsg({ tipo: 'error', texto: e.message }));
+  useEffect(() => {
+    cargar();
+  }, []);
+  async function copiarAhora() {
+    setOcupado(true);
+    setMsg(null);
+    try {
+      const r = await post('copia-drive', {});
+      setMsg({ tipo: 'ok', texto: `Copia guardada en Drive: ${r.nombre}` });
+    } catch (e: any) {
+      setMsg({ tipo: 'error', texto: e.message });
+    } finally {
+      setOcupado(false);
+      cargar();
+    }
+  }
+  if (!estado) return msg ? <div className={msg.tipo}>{msg.texto}</div> : null;
+  return (
+    <>
+      <h3>Copias automáticas en Google Drive</h3>
+      {estado.error ? (
+        <div className="error">La configuración de Drive tiene un problema: {estado.error}</div>
+      ) : estado.configurado ? (
+        <p className="small muted">
+          Activas. Cada día a partir de las 3:00 se guarda una copia en la carpeta de Drive (se conservan las últimas {estado.conservadas}),
+          y otra cada vez que se cierra un trimestre, que no se borra nunca. La carpeta está compartida con la cuenta{' '}
+          <code>{estado.cuenta}</code>.
+        </p>
+      ) : (
+        <p className="small muted">
+          Sin configurar: de momento las copias solo se pueden descargar a mano. Para activarlas hay que crear una cuenta de servicio de
+          Google y poner sus datos en Railway (los pasos están en el README).
+        </p>
+      )}
+      {estado.configurado && (
+        <button className="btn sec" disabled={ocupado} onClick={copiarAhora}>
+          {ocupado ? 'Copiando…' : 'Copiar a Drive ahora'}
+        </button>
+      )}
+      {msg && (
+        <div className={msg.tipo} style={{ marginTop: 10 }}>
+          {msg.texto}
+        </div>
+      )}
+      {estado.ultimas.length > 0 && (
+        <table style={{ marginTop: 12 }}>
+          <thead>
+            <tr>
+              <th>Cuándo</th>
+              <th>Tipo</th>
+              <th>Resultado</th>
+              <th>Fichero</th>
+            </tr>
+          </thead>
+          <tbody>
+            {estado.ultimas.map((c: any) => (
+              <tr key={c.id}>
+                <td className="small">{new Date(c.ts).toLocaleString('es-ES', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                <td className="small">{MOTIVO_COPIA[c.motivo] ?? c.motivo}</td>
+                <td className="small">
+                  <span className={c.ok ? 'estado verde' : 'estado rojo'}>{c.ok ? 'Guardada' : 'Fallida'}</span> {c.detalle}
+                </td>
+                <td className="small">{c.nombre}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  );
+}
+
 function Historial({ datos }: Props) {
   const [filtro, setFiltro] = useState('');
   const [msg, setMsg] = useState('');
@@ -1248,10 +1331,11 @@ function Historial({ datos }: Props) {
       <section className="panel">
         <h2>Copia de seguridad</h2>
         <p className="small muted">
-          Descarga la base de datos completa (todos los locales y periodos, con su historial) en un único fichero. Guárdala en un sitio
-          seguro: contiene los datos de todos los usuarios. Conviene hacerlo al menos al cerrar cada mes y siempre después del cierre del
-          trimestre.
+          La copia contiene la base de datos completa (todos los locales y periodos, con su historial y los usuarios) en un único fichero.
+          Guárdala solo en sitios privados.
         </p>
+        <CopiasDrive />
+        <h3 style={{ marginTop: 22 }}>Descarga manual</h3>
         <button
           className="btn sec"
           onClick={() => {
