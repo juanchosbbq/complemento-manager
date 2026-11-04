@@ -9,49 +9,65 @@ import { DB, ahora } from './db';
 import * as repo from './repo';
 
 type N = [string, number, number | null, number, number]; // kpi, umbral, llave, objetivo, excelencia
-const n = (filas: N[]) => filas.map(([kpi, umbral, llave, objetivo, excelencia]) => ({ kpi, umbral, llave: llave ?? undefined, objetivo, excelencia }));
+const n = (filas: N[]) =>
+  filas.map(([kpi, umbral, llave, objetivo, excelencia]) => ({ kpi, umbral, llave: llave ?? undefined, objetivo, excelencia }));
 
 const COMUNES: N[] = [
-  ['K6A_MISTERIOSO_SALA', 6, 7, 8, 10], ['K6B_MISTERIOSO_PRODUCTO', 6, 7, 8, 10],
+  ['K6A_MISTERIOSO_SALA', 6, 7, 8, 10],
+  ['K6B_MISTERIOSO_PRODUCTO', 6, 7, 8, 10],
   ['K9_DISPONIBILIDAD', 0, null, 100, 100],
-  ['K10_CHECKLIST', 60, 75, 85, 100], ['K11_HALLAZGOS', 60, 75, 85, 100],
-  ['K12A_INICIATIVAS', 75, 90, 100, 110], ['K12B_REPORTES', 75, 90, 100, 110],
+  ['K10_CHECKLIST', 60, 75, 85, 100],
+  ['K11_HALLAZGOS', 60, 75, 85, 100],
+  ['K12A_INICIATIVAS', 75, 90, 100, 110],
+  ['K12B_REPORTES', 75, 90, 100, 110],
   ['K13_CUALITATIVA', 6, 7, 8, 10],
 ];
 
 export const CARTAS: { id: string; local: string; periodo: string; config: Record<string, any>; niveles: ReturnType<typeof n> }[] = [
   {
-    id: 'carta-q4-2026-L1', local: 'L1', periodo: 'Q4-2026',
-    config: { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4.0, umbral_descuentos_pct: 0.3, productos_estrategicos: 'Entrantes (% sobre facturación)' },
+    id: 'carta-q4-2026-L1',
+    local: 'L1',
+    periodo: 'Q4-2026',
+    config: {
+      importe_objetivo: 1500,
+      perfil_canal: 'MIXTO',
+      suelo_nota_resenas: 4.0,
+      umbral_descuentos_pct: 0.3,
+      productos_estrategicos: 'Entrantes (% sobre facturación)',
+    },
     niveles: n([
       ['K1_FACTURACION', 166631.89, 235147.71, 277719.81, 305491.79],
-      ['K2_TICKET', 31.90, 34.30, 37.20, 39.20],
-      ['K3_PRODUCTOS', 7.00, 10.50, 14, 18],
+      ['K2_TICKET', 31.9, 34.3, 37.2, 39.2],
+      ['K3_PRODUCTOS', 7.0, 10.5, 14, 18],
       ['K4A_RESENAS_VOLUMEN', 125, 200, 250, 325],
       ['K4B_RESENAS_NOTA', 4.0, 4.5, 4.75, 4.9],
       ['K5_RATING_UBER', 4.3, 4.4, 4.5, 4.7],
       ['K7_PRECISION', 2.4, 1.9, 1.0, 0.6],
-      ['K8_COCINA', 0.30, 0.20, 0.10, 0],
+      ['K8_COCINA', 0.3, 0.2, 0.1, 0],
       ...COMUNES,
     ]),
   },
   {
-    id: 'carta-q4-2026-L2', local: 'L2', periodo: 'Q4-2026',
+    id: 'carta-q4-2026-L2',
+    local: 'L2',
+    periodo: 'Q4-2026',
     config: { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4.4, umbral_descuentos_pct: 0.3 },
     niveles: n([
-      ['K1_FACTURACION', 128428.56, 201290.22, 214047.60, 235452.36],
-      ['K2_TICKET', 34.89, 38.50, 43.24, 45.24],
-      ['K3_PRODUCTOS', 8.00, 11.65, 15, 18],
+      ['K1_FACTURACION', 128428.56, 201290.22, 214047.6, 235452.36],
+      ['K2_TICKET', 34.89, 38.5, 43.24, 45.24],
+      ['K3_PRODUCTOS', 8.0, 11.65, 15, 18],
       ['K4A_RESENAS_VOLUMEN', 150, 250, 300, 375],
       ['K4B_RESENAS_NOTA', 4.4, 4.6, 4.8, 4.9],
       ['K5_RATING_UBER', 3.9, 4.1, 4.2, 4.4],
       ['K7_PRECISION', 2.0, 1.3, 1.0, 0.6],
-      ['K8_COCINA', 0.30, 0.15, 0.10, 0],
+      ['K8_COCINA', 0.3, 0.15, 0.1, 0],
       ...COMUNES,
     ]),
   },
   {
-    id: 'carta-q4-2026-L3', local: 'L3', periodo: 'Q4-2026',
+    id: 'carta-q4-2026-L3',
+    local: 'L3',
+    periodo: 'Q4-2026',
     config: { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4.4, umbral_descuentos_pct: 0.3 },
     niveles: n([
       ['K1_FACTURACION', 83078.55, 125876.59, 138464.25, 152310.67],
@@ -61,7 +77,7 @@ export const CARTAS: { id: string; local: string; periodo: string; config: Recor
       ['K4B_RESENAS_NOTA', 4.4, 4.6, 4.8, 4.9],
       ['K5_RATING_UBER', 4.0, 4.1, 4.2, 4.4],
       ['K7_PRECISION', 1.8, 1.5, 1.2, 1.0],
-      ['K8_COCINA', 0.30, 0.20, 0.15, 0.10],
+      ['K8_COCINA', 0.3, 0.2, 0.15, 0.1],
       ...COMUNES,
     ]),
   },

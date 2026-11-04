@@ -16,7 +16,7 @@
 7. **Sistema de tickets** para incidencias de sala y escalados a cocina (SLA 30 min / 24 h). Hoy la neutralización por escalado se registra a mano con evidencia; el registro debería nacer del ticket.
 8. **Valoración cualitativa**: ahora es nota 1–10 con justificación. Decidir si la rúbrica de cuatro criterios se mantiene como guía escrita para la justificación (hoy solo se cita en la ayuda del formulario).
 9. **Coste de personal de sala**: decidir si entra en el modelo. Se está midiendo con la misma calidad que un KPI.
-10. **Cierre y reclamación**: la foto de liquidación se puede sobrescribir. Si se quiere historial de cierres, convertir `liquidaciones` en tabla con versión.
+10. ~~**Cierre y reclamación**~~ Resuelto en v6.6: la foto sigue pudiéndose sustituir (solo Dirección), pero cada cierre queda en el historial con fecha, autor, importe, logro y si fue forzado.
 
 ## Documentos a corregir (fuera de la app)
 
@@ -29,6 +29,8 @@
 ## Mejoras no urgentes
 
 - Conectar Revo por API (hoy export manual): solo cambia quién escribe `meses` con `origen = automatico`.
-- Exportar la liquidación cerrada a PDF para la revisión trimestral.
-- Historial de cambios de configuración (hoy solo autor y fecha del último cambio).
+- ~~Exportar la liquidación cerrada a PDF~~ Hecho en v6.6.
+- ~~Historial de cambios de configuración~~ Hecho en v6.6 (todas las escrituras).
+- Historial de cambios de **usuarios** (altas, roles, bajas): hoy solo se guarda quién creó cada usuario.
+- Railway tiene un cambio preparado y sin aplicar desde el 19-sep (`ADMIN_PASSWORD`). Solo se usa si la base no tiene usuarios, así que no afecta; se puede descartar en Railway.
 - Sustituir `node:sqlite` por better-sqlite3 si Node cambia la API experimental.

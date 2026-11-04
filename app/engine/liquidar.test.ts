@@ -12,10 +12,14 @@ function base(over: Partial<EntradaLiquidacion> = {}): EntradaLiquidacion {
   const kpis: Partial<Record<KpiId, ValorKpi>> = {};
   for (const k of KPIS) kpis[k.id] = L(100, k.id);
   return {
-    importeObjetivo: 1500, perfilCanal: 'MIXTO', kpis,
+    importeObjetivo: 1500,
+    perfilCanal: 'MIXTO',
+    kpis,
     condiciones: { descuentosExcedidos: false, fichasMisterioso: 2, hayConsumicion: true, notaBajoSuelo: false },
     puertas: { seguridadAlimentaria: true, reporting: true, controlCaja: true, integridad: true },
-    prorrateo: 1, bajaVoluntaria: false, ...over,
+    prorrateo: 1,
+    bajaVoluntaria: false,
+    ...over,
   };
 }
 const conLogros = (l: Partial<Record<KpiId, number>>, over: Partial<EntradaLiquidacion> = {}) => {
@@ -45,22 +49,23 @@ describe('Escala de cada KPI (§2.3)', () => {
     expect(logroKpi(1.5, m, 'menor')).toBe(110);
     expect(logroKpi(0.5, m, 'menor')).toBe(120);
   });
-  it('rúbrica cualitativa: 7/8 → 110% (ejemplo §13 v7)', () => expect(logroKpi(7, { umbral: 4, objetivo: 6, excelencia: 8 }, 'mayor')).toBe(110));
+  it('rúbrica cualitativa: 7/8 → 110% (ejemplo §13 v7)', () =>
+    expect(logroKpi(7, { umbral: 4, objetivo: 6, excelencia: 8 }, 'mayor')).toBe(110));
 });
 
 describe('Llave calibrada a mano (no es el punto medio entre umbral y objetivo)', () => {
   // Ticket medio de Gabriel Lobo: umbral 31,90 · llave 34,30 · objetivo 37,20 · excelencia 39,20
-  const n = { umbral: 31.90, llave: 34.30, objetivo: 37.20, excelencia: 39.20 };
-  it('en la llave da exactamente 90', () => expect(logroKpi(34.30, n, 'mayor')).toBe(90));
+  const n = { umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 };
+  it('en la llave da exactamente 90', () => expect(logroKpi(34.3, n, 'mayor')).toBe(90));
   it('en el umbral da 50, en el objetivo 100, en la excelencia 120', () => {
-    expect(logroKpi(31.90, n, 'mayor')).toBe(50);
-    expect(logroKpi(37.20, n, 'mayor')).toBe(100);
-    expect(logroKpi(39.20, n, 'mayor')).toBe(120);
+    expect(logroKpi(31.9, n, 'mayor')).toBe(50);
+    expect(logroKpi(37.2, n, 'mayor')).toBe(100);
+    expect(logroKpi(39.2, n, 'mayor')).toBe(120);
   });
   it('interpola distinto a un lado y otro de la llave (los tramos no son simétricos)', () => {
     // tramo umbral→llave es más corto (2,40€) que llave→objetivo (2,90€): la misma distancia en € vale más logro en el primer tramo
-    const puntoMedioTramo1 = logroKpi(31.90 + 1.20, n, 'mayor'); // mitad de umbral→llave
-    const puntoMedioTramo2 = logroKpi(34.30 + 1.45, n, 'mayor'); // mitad de llave→objetivo
+    const puntoMedioTramo1 = logroKpi(31.9 + 1.2, n, 'mayor'); // mitad de umbral→llave
+    const puntoMedioTramo2 = logroKpi(34.3 + 1.45, n, 'mayor'); // mitad de llave→objetivo
     expect(puntoMedioTramo1).toBeCloseTo(70, 9); // 50 + (90-50)/2
     expect(puntoMedioTramo2).toBeCloseTo(95, 9); // 90 + (100-90)/2
   });
@@ -105,11 +110,22 @@ describe('Pesos del modelo', () => {
 
 describe('Ejemplo de liquidación §13 v7 (Malasaña, Q4) — bloques troncales', () => {
   const logros: Partial<Record<KpiId, number>> = {
-    K1_FACTURACION: 104, K2_TICKET: 106, K3_PRODUCTOS: 95,
-    K4A_RESENAS_VOLUMEN: 110, K4B_RESENAS_NOTA: 98, K5_RATING_UBER: 96, K6A_MISTERIOSO_SALA: 88, K6B_MISTERIOSO_PRODUCTO: 88,
-    K7_PRECISION: 106, K8_COCINA: 72, K9_DISPONIBILIDAD: 100,
-    K10_CHECKLIST: 65, K11_HALLAZGOS: 100,
-    K12A_INICIATIVAS: 100, K12B_REPORTES: 92, K13_CUALITATIVA: 110,
+    K1_FACTURACION: 104,
+    K2_TICKET: 106,
+    K3_PRODUCTOS: 95,
+    K4A_RESENAS_VOLUMEN: 110,
+    K4B_RESENAS_NOTA: 98,
+    K5_RATING_UBER: 96,
+    K6A_MISTERIOSO_SALA: 88,
+    K6B_MISTERIOSO_PRODUCTO: 88,
+    K7_PRECISION: 106,
+    K8_COCINA: 72,
+    K9_DISPONIBILIDAD: 100,
+    K10_CHECKLIST: 65,
+    K11_HALLAZGOS: 100,
+    K12A_INICIATIVAS: 100,
+    K12B_REPORTES: 92,
+    K13_CUALITATIVA: 110,
   };
   it('reproduce los logros de bloque del documento (sin el redondeo intermedio del PDF: 102,4 / 98,6 / 96,9)', () => {
     // El documento redondea los puntos de cada KPI a una décima antes de sumar (30,8 → 102,7). El motor no redondea hasta el final.
@@ -200,7 +216,8 @@ describe('Cap de excelencia (§2.3)', () => {
 describe('Puertas de acceso (§9)', () => {
   it('cualquier puerta fallida → 0 aunque la nota sea 120 y 4/4', () => {
     for (const p of ['seguridadAlimentaria', 'reporting', 'controlCaja', 'integridad'] as const) {
-      const e = base(); e.puertas[p] = false;
+      const e = base();
+      e.puertas[p] = false;
       const r = liquidar(e);
       expect(r.puertas.superadas).toBe(false);
       expect(r.pago).toBe(0);
@@ -211,7 +228,8 @@ describe('Puertas de acceso (§9)', () => {
 
 describe('Descuentos no tipificados (decisión 5)', () => {
   it('excedidos en algún mes: Ventas puntúa pero no cuenta como llave', () => {
-    const e = base(); e.condiciones.descuentosExcedidos = true;
+    const e = base();
+    e.condiciones.descuentosExcedidos = true;
     const r = liquidar(e);
     expect(bloque(r, 'VENTAS').logro).toBe(100);
     expect(bloque(r, 'VENTAS').llaveCumplida).toBe(false);
@@ -233,15 +251,18 @@ describe('Neutralizaciones (decisión 6)', () => {
     expect(kpi(r, 'K9_DISPONIBILIDAD').logro).toBe(100);
   });
   it('sin dato y sin neutralización computa 0', () => {
-    const e = base(); e.kpis.K5_RATING_UBER = { valor: null, niveles: ID };
+    const e = base();
+    e.kpis.K5_RATING_UBER = { valor: null, niveles: ID };
     expect(kpi(liquidar(e), 'K5_RATING_UBER').logro).toBe(0);
   });
 });
 
 describe('Redistribuciones de peso condicionales', () => {
   it('nota bajo suelo: el 6% de volumen pasa a nota (lectura B)', () => {
-    const e = base(); e.condiciones.notaBajoSuelo = true;
-    e.kpis.K4A_RESENAS_VOLUMEN = L(120); e.kpis.K4B_RESENAS_NOTA = L(0);
+    const e = base();
+    e.condiciones.notaBajoSuelo = true;
+    e.kpis.K4A_RESENAS_VOLUMEN = L(120);
+    e.kpis.K4B_RESENAS_NOTA = L(0);
     const r = liquidar(e);
     expect(kpi(r, 'K4A_RESENAS_VOLUMEN').pesoEfectivo).toBe(0);
     expect(kpi(r, 'K4B_RESENAS_NOTA').pesoEfectivo).toBe(10);
@@ -249,7 +270,8 @@ describe('Redistribuciones de peso condicionales', () => {
     expect(bloque(r, 'ATENCION').peso).toBe(20);
   });
   it('menos de dos fichas de cliente misterioso: su 5% se reparte entre 4 y 5 proporcionalmente', () => {
-    const e = base(); e.condiciones.fichasMisterioso = 1;
+    const e = base();
+    e.condiciones.fichasMisterioso = 1;
     const r = liquidar(e);
     expect(kpi(r, 'K6A_MISTERIOSO_SALA').pesoEfectivo).toBe(0);
     expect(kpi(r, 'K6B_MISTERIOSO_PRODUCTO').pesoEfectivo).toBe(0);
@@ -259,7 +281,8 @@ describe('Redistribuciones de peso condicionales', () => {
     expect(r.kpis.filter(k => k.bloque === 'ATENCION').reduce((s, k) => s + k.pesoEfectivo, 0)).toBeCloseTo(20, 1);
   });
   it('sin consumición en ninguna ficha: el 1% de producto pasa a sala', () => {
-    const e = base(); e.condiciones.hayConsumicion = false;
+    const e = base();
+    e.condiciones.hayConsumicion = false;
     const r = liquidar(e);
     expect(kpi(r, 'K6A_MISTERIOSO_SALA').pesoEfectivo).toBe(5);
     expect(kpi(r, 'K6B_MISTERIOSO_PRODUCTO').pesoEfectivo).toBe(0);
@@ -287,7 +310,7 @@ describe('Indicadores todavía sin dato (seguimiento a fecha)', () => {
     const r = liquidar(e);
     const k = kpi(r, 'K13_CUALITATIVA');
     expect(k.pendiente).toBe(true);
-    expect(bloque(r, 'DIRECCION').logro).toBe(100);   // el resto del bloque va al 100
+    expect(bloque(r, 'DIRECCION').logro).toBe(100); // el resto del bloque va al 100
     expect(bloque(r, 'DIRECCION').pendientes).toBe(1);
     expect(bloque(r, 'DIRECCION').pesoMedido).toBe(15);
     expect(r.logroPonderado).toBe(100);
@@ -330,13 +353,21 @@ describe('Qué falta para encender la llave', () => {
     const e = base({ parcial: true });
     e.kpis.K10_CHECKLIST = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
     e.kpis.K11_HALLAZGOS = { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 100 } };
-    e.kpis.K10_CHECKLIST.valor = 60; e.kpis.K11_HALLAZGOS.valor = 60;
-    const r = liquidar({ ...e, kpis: { ...e.kpis, K10_CHECKLIST: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } }, K11_HALLAZGOS: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } } } });
+    e.kpis.K10_CHECKLIST.valor = 60;
+    e.kpis.K11_HALLAZGOS.valor = 60;
+    const r = liquidar({
+      ...e,
+      kpis: {
+        ...e.kpis,
+        K10_CHECKLIST: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } },
+        K11_HALLAZGOS: { valor: 60, niveles: { umbral: 60, llave: 75, objetivo: 85, excelencia: 62 } },
+      },
+    });
     const f = faltaParaLlave(e, r).find(x => x.bloque === 'MANTENIMIENTO');
     expect(f).toBeDefined();
   });
   it('valorParaLogro es la inversa exacta de logroKpi, también con llave calibrada', () => {
-    const n = { umbral: 31.90, llave: 34.30, objetivo: 37.20, excelencia: 39.20 };
+    const n = { umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 };
     for (const logro of [50, 70, 90, 95, 100, 110, 120]) {
       expect(logroKpi(valorParaLogro(logro, n, 'mayor'), n, 'mayor')).toBeCloseTo(logro, 6);
     }

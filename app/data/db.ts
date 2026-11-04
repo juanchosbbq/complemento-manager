@@ -195,7 +195,13 @@ export function abrir(ruta = process.env.INCENTIVOS_DB ?? new URL('./incentivos.
     'ALTER TABLE meses ADD COLUMN prevision_facturacion REAL',
     'ALTER TABLE meses ADD COLUMN prevision_resenas INTEGER',
     'ALTER TABLE hallazgos ADD COLUMN archivado INTEGER NOT NULL DEFAULT 0',
-  ]) { try { db.exec(sql); } catch { /* ya existía */ } }
+  ]) {
+    try {
+      db.exec(sql);
+    } catch {
+      /* ya existía */
+    }
+  }
   return db;
 }
 

@@ -152,3 +152,12 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Tabla de KPIs en tres grupos**: Hoy (columna **Actual**, antes "Valor", destacada) · Escala de la carta (50% · 90% · **100%** · 120%, enmarcada) · Resultado (logro en rectángulo de color y puntos en círculo).
 - **"Qué tienes que hacer en cada llave para mejorar"** sustituye a "Lo que falta para encender cada llave": por cada llave, si está apagada, qué haría falta para encenderla; y los indicadores por debajo de su objetivo, de peor a mejor, con un consejo concreto para el local.
 - **Checklist**: la semana se elige en un desplegable, de la actual hacia atrás hasta el inicio del trimestre, con fechas y una marca ✓ en las ya registradas. El servidor rechaza semanas futuras.
+
+## v6.6 (4-nov-2026) — robustez y rastro
+
+- **Servidor**: una petición mal formada o de más de 5 MB devuelve un error en vez de tumbar el servidor. Cabeceras de seguridad y caché en la interfaz.
+- **Historial de cambios en todo**: checklists (también cuando se sobrescriben), configuración, umbrales, puertas, visitas, fichas, compromisos, valoración cualitativa, descuentos, coste de personal, neutralizaciones, cierres y vaciados. Pestaña *Historial y copia* en Dirección para consultarlo campo a campo.
+- **Neutralizaciones**: borrar una comprueba que sea de ese local y periodo.
+- **Checklist del Manager con plazo**: cada semana se puede registrar, corregir o borrar hasta 5 días después del domingo (el viernes siguiente). Después queda cerrada para el Manager; Dirección puede corregirla siempre. El servidor valida además que la semana sea del periodo y que las líneas sean del catálogo de su hoja.
+- **PDF del cierre**: desde *Cierre del trimestre*, con bloques, llaves, puertas, cada indicador contra su escala, explicación del cálculo e importe.
+- **Copia de seguridad**: descarga de la base de datos completa desde *Historial y copia*.

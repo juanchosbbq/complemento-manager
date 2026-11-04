@@ -16,31 +16,32 @@ import { KpiId, MotivoNeutralizacion, NIVELES_CUALITATIVA, PerfilCanal } from '.
 import { EntradaLiquidacion, Niveles, Puertas, ValorKpi } from './liquidar';
 
 export interface MesDatos {
-  mes: string;                         // 'YYYY-MM'
-  facturacionReal: number | null;      // € netos
-  ticketMedio: number | null;          // € — se toma de Revo o se calcula fuera; no se piden los tickets
+  mes: string; // 'YYYY-MM'
+  facturacionReal: number | null; // € netos
+  ticketMedio: number | null; // € — se toma de Revo o se calcula fuera; no se piden los tickets
   productosPenetracion: number | null; // % de la facturación en producto estratégico
   resenasVolumen: number | null;
-  resenasNotaMedia: number | null;     // 1–5, media del mes
+  resenasNotaMedia: number | null; // 1–5, media del mes
   /** Meta volante opcional: reparto previsto del trimestre. Solo afecta al seguimiento a fecha, nunca a la liquidación. */
   previsionFacturacion: number | null;
   previsionResenas: number | null;
 }
 
 export interface UberMes {
-  mes: string; pedidos: number | null;
-  inaccurateRate: number | null;       // %
-  foodQualityRate: number | null;      // % (Food Taste or Quality Issues)
-  onlineRate: number | null;           // %
-  rating: number | null;               // 1–5 del periodo
+  mes: string;
+  pedidos: number | null;
+  inaccurateRate: number | null; // %
+  foodQualityRate: number | null; // % (Food Taste or Quality Issues)
+  onlineRate: number | null; // %
+  rating: number | null; // 1–5 del periodo
 }
 
 export interface LineaChecklist {
-  semana: string;            // 'YYYY-Www'
+  semana: string; // 'YYYY-Www'
   hoja: 'A' | 'B';
   lineaId: string;
   estado: 'CONFORME' | 'NO_CONFORME';
-  avisoEn24h: boolean;       // solo relevante si NO_CONFORME
+  avisoEn24h: boolean; // solo relevante si NO_CONFORME
   /** dirección lo encontró NO CONFORME en visita y juzgó que debió verse en el último checklist */
   hallazgoNoReportado: boolean;
 }
@@ -54,18 +55,28 @@ export interface Hallazgo {
 
 export interface FichaMisterioso {
   fecha: string;
-  sala: number;               // 1–10
-  producto: number | null;    // 1–10, null si no hubo consumición
+  sala: number; // 1–10
+  producto: number | null; // 1–10, null si no hubo consumición
 }
 
 export interface Compromisos {
-  iniciativasTotal: number; iniciativasEnPlazo: number;
-  reportesTotal: number; reportesEnFecha: number;
+  iniciativasTotal: number;
+  iniciativasEnPlazo: number;
+  reportesTotal: number;
+  reportesEnFecha: number;
 }
 
-export interface DescuentoMes { mes: string; ventas: number; noTipificados: number }
+export interface DescuentoMes {
+  mes: string;
+  ventas: number;
+  noTipificados: number;
+}
 
-export interface Neutralizacion { kpi: KpiId; motivo: MotivoNeutralizacion; evidencia?: string }
+export interface Neutralizacion {
+  kpi: KpiId;
+  motivo: MotivoNeutralizacion;
+  evidencia?: string;
+}
 
 export interface DatosPeriodo {
   meses: MesDatos[];
@@ -74,7 +85,7 @@ export interface DatosPeriodo {
   hallazgos: Hallazgo[];
   fichas: FichaMisterioso[];
   compromisos: Compromisos;
-  cualitativa: number | null;  // 0–8
+  cualitativa: number | null; // 0–8
   descuentos: DescuentoMes[];
   neutralizaciones: Neutralizacion[];
 }
@@ -86,7 +97,7 @@ export interface ConfigPeriodo {
   sueloNotaResenas: number;
   /** true en el seguimiento a fecha */
   parcial?: boolean;
-  umbralDescuentosPct: number;    // 0,3
+  umbralDescuentosPct: number; // 0,3
   puertas: Puertas;
   prorrateo: number;
   bajaVoluntaria: boolean;
@@ -110,11 +121,15 @@ export interface Agregados {
   escalaNiveles: Partial<Record<KpiId, number>>;
   condiciones: EntradaLiquidacion['condiciones'];
   aux: {
-    ticketMedioReal: number | null; ticketMedioObjetivo: number | null;
+    ticketMedioReal: number | null;
+    ticketMedioObjetivo: number | null;
     notaMediaTrimestre: number | null;
-    fiabilidadA: number | null; fiabilidadB: number | null; hayPrevision?: boolean;
+    fiabilidadA: number | null;
+    fiabilidadB: number | null;
+    hayPrevision?: boolean;
     descuentosPorMes: { mes: string; pct: number | null; excedido: boolean }[];
-    hallazgosEvaluables: number; hallazgosCerrados: number;
+    hallazgosEvaluables: number;
+    hallazgosCerrados: number;
   };
 }
 
@@ -136,7 +151,9 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   const conFact = mesesTicket.filter(m => m.facturacionReal !== null && m.facturacionReal > 0);
   const k2 = conFact.length
     ? sum(conFact.map(m => m.facturacionReal)) / sum(conFact.map(m => m.facturacionReal! / m.ticketMedio!))
-    : (mesesTicket.length ? sum(mesesTicket.map(m => m.ticketMedio)) / mesesTicket.length : null);
+    : mesesTicket.length
+      ? sum(mesesTicket.map(m => m.ticketMedio)) / mesesTicket.length
+      : null;
   // KPI 3: % de la facturación, ponderado por la facturación de cada mes
   const k3 = mediaPonderada(d.meses.map(m => [m.productosPenetracion, m.facturacionReal]));
   // KPI 4
@@ -158,8 +175,11 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   // KPI 9 binario: Online Rate del periodo ≥ objetivo → 100; si no → 0 (salvo neutralización por parada justificada)
   const online = uberPond(u => u.onlineRate);
   const objetivoOnline = cfg.niveles.K9_DISPONIBILIDAD?.objetivo ?? 100;
-  const k9 = online === null ? null : (online >= objetivoOnline ? 100 : 0);
-  const k9detalle = online === null ? 'Sin dato de Online Rate' : `Online Rate ${r2(online)}% · objetivo ${objetivoOnline}% → ${online >= objetivoOnline ? 'cumple' : 'no cumple (0)'}`;
+  const k9 = online === null ? null : online >= objetivoOnline ? 100 : 0;
+  const k9detalle =
+    online === null
+      ? 'Sin dato de Online Rate'
+      : `Online Rate ${r2(online)}% · objetivo ${objetivoOnline}% → ${online >= objetivoOnline ? 'cumple' : 'no cumple (0)'}`;
   // KPI 6
   const k6a = d.fichas.length ? sum(d.fichas.map(f => f.sala)) / d.fichas.length : null;
   const conProducto = d.fichas.filter(f => f.producto !== null);
@@ -171,7 +191,8 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
     const validas = ls.filter(l => !l.hallazgoNoReportado && (l.estado === 'CONFORME' || l.avisoEn24h)).length;
     return (validas / ls.length) * 100;
   };
-  const fA = fiab('A'), fB = fiab('B');
+  const fA = fiab('A'),
+    fB = fiab('B');
   const k10 = fA === null || fB === null ? (fA ?? fB) : Math.min(fA, fB);
   // KPI 11
   const evaluables = d.hallazgos.filter(h => h.cerradoEnVisitaSiguiente !== null);
@@ -188,10 +209,19 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
   });
 
   const valores: Agregados['valores'] = {
-    K1_FACTURACION: { valor: r2(k1), detalle: `${conDato.length} de ${nMeses} meses con dato${f1 < 1 ? ` · objetivo del trimestre prorrateado al ${Math.round(f1 * 100)}%${hayPrevision ? ' según la previsión mensual' : ' (a partes iguales: sin previsión mensual cargada)'}` : ''}` },
-    K2_TICKET: { valor: r2(k2), detalle: `Ticket medio del trimestre sobre ${mesesTicket.length} mes/es${conFact.length ? ', ponderado por facturación' : ''}` },
+    K1_FACTURACION: {
+      valor: r2(k1),
+      detalle: `${conDato.length} de ${nMeses} meses con dato${f1 < 1 ? ` · objetivo del trimestre prorrateado al ${Math.round(f1 * 100)}%${hayPrevision ? ' según la previsión mensual' : ' (a partes iguales: sin previsión mensual cargada)'}` : ''}`,
+    },
+    K2_TICKET: {
+      valor: r2(k2),
+      detalle: `Ticket medio del trimestre sobre ${mesesTicket.length} mes/es${conFact.length ? ', ponderado por facturación' : ''}`,
+    },
     K3_PRODUCTOS: { valor: r1(k3), detalle: 'Penetración ponderada por tickets del periodo' },
-    K4A_RESENAS_VOLUMEN: { valor: k4a, detalle: `${mesesRes.length} de ${nMeses} meses con dato${f4 < 1 ? ` · objetivo del trimestre prorrateado al ${Math.round(f4 * 100)}%` : ''}` },
+    K4A_RESENAS_VOLUMEN: {
+      valor: k4a,
+      detalle: `${mesesRes.length} de ${nMeses} meses con dato${f4 < 1 ? ` · objetivo del trimestre prorrateado al ${Math.round(f4 * 100)}%` : ''}`,
+    },
     K4B_RESENAS_NOTA: { valor: r2(k4b), detalle: `Media de todas las reseñas del periodo · suelo ${cfg.sueloNotaResenas}` },
     K5_RATING_UBER: { valor: r2(k5), detalle: 'Rating del periodo ponderado por pedidos' },
     K6A_MISTERIOSO_SALA: { valor: r1(k6a), detalle: `${d.fichas.length} ficha(s) en el trimestre` },
@@ -200,7 +230,12 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
     K8_COCINA: { valor: r2(k8), detalle: 'Food Taste or Quality Issues, ponderado por pedidos' },
     K9_DISPONIBILIDAD: { valor: r1(k9), detalle: k9detalle },
     K10_CHECKLIST: { valor: r1(k10), detalle: `Hoja A ${r1(fA) ?? '—'}% · Hoja B ${r1(fB) ?? '—'}% → computa la peor` },
-    K11_HALLAZGOS: { valor: r1(k11), detalle: evaluables.length ? `${cerrados} de ${evaluables.length} hallazgos cerrados en la visita siguiente` : 'Sin hallazgos evaluables en el periodo: 100%' },
+    K11_HALLAZGOS: {
+      valor: r1(k11),
+      detalle: evaluables.length
+        ? `${cerrados} de ${evaluables.length} hallazgos cerrados en la visita siguiente`
+        : 'Sin hallazgos evaluables en el periodo: 100%',
+    },
     K12A_INICIATIVAS: { valor: r1(k12a), detalle: `${c.iniciativasEnPlazo} de ${c.iniciativasTotal} iniciativas en plazo` },
     K12B_REPORTES: { valor: r1(k12b), detalle: `${c.reportesEnFecha} de ${c.reportesTotal} reportes en fecha` },
     K13_CUALITATIVA: { valor: d.cualitativa, detalle: 'Nota 1–10 de dirección con justificación escrita, al cierre del trimestre' },
@@ -216,9 +251,15 @@ export function agregar(d: DatosPeriodo, cfg: ConfigPeriodo): Agregados {
       notaBajoSuelo,
     },
     aux: {
-      ticketMedioReal: r2(k2), ticketMedioObjetivo: null, notaMediaTrimestre: r2(k4b), hayPrevision,
-      fiabilidadA: r1(fA), fiabilidadB: r1(fB), descuentosPorMes,
-      hallazgosEvaluables: evaluables.length, hallazgosCerrados: cerrados,
+      ticketMedioReal: r2(k2),
+      ticketMedioObjetivo: null,
+      notaMediaTrimestre: r2(k4b),
+      hayPrevision,
+      fiabilidadA: r1(fA),
+      fiabilidadB: r1(fB),
+      descuentosPorMes,
+      hallazgosEvaluables: evaluables.length,
+      hallazgosCerrados: cerrados,
     },
   };
 }
@@ -237,7 +278,12 @@ export function construirEntrada(d: DatosPeriodo, cfg: ConfigPeriodo): { entrada
     let niveles = id === 'K9_DISPONIBILIDAD' ? NIVELES_K9_IDENTIDAD : (cfg.niveles[id] ?? NIVELES_FIJOS[id]);
     const f = ag.escalaNiveles[id];
     if (niveles && f !== undefined && f < 1) {
-      niveles = { umbral: niveles.umbral * f, objetivo: niveles.objetivo * f, excelencia: niveles.excelencia * f, llave: niveles.llave !== undefined ? niveles.llave * f : undefined };
+      niveles = {
+        umbral: niveles.umbral * f,
+        objetivo: niveles.objetivo * f,
+        excelencia: niveles.excelencia * f,
+        llave: niveles.llave !== undefined ? niveles.llave * f : undefined,
+      };
     }
     const n = d.neutralizaciones.find(x => x.kpi === id);
     kpis[id] = {
@@ -249,8 +295,13 @@ export function construirEntrada(d: DatosPeriodo, cfg: ConfigPeriodo): { entrada
   }
   return {
     entrada: {
-      importeObjetivo: cfg.importeObjetivo, perfilCanal: cfg.perfilCanal, kpis,
-      condiciones: ag.condiciones, puertas: cfg.puertas, prorrateo: cfg.prorrateo, bajaVoluntaria: cfg.bajaVoluntaria,
+      importeObjetivo: cfg.importeObjetivo,
+      perfilCanal: cfg.perfilCanal,
+      kpis,
+      condiciones: ag.condiciones,
+      puertas: cfg.puertas,
+      prorrateo: cfg.prorrateo,
+      bajaVoluntaria: cfg.bajaVoluntaria,
       parcial: cfg.parcial,
     },
     agregados: ag,

@@ -82,10 +82,16 @@ function sincronizarCatalogo() {
 function asegurarAdmin() {
   const a = asegurarAdminInicial(db);
   if (!a) return;
-  if (a.forzada) console.log(`\n>>> RESET_ADMIN_PASSWORD activo: contraseña de ${a.email} forzada a la de esa variable. Quítala de Railway en cuanto entres.\n`);
-  else console.log(a.generada
-    ? `\n>>> PRIMER ADMINISTRADOR creado: ${a.email}\n>>> Contraseña temporal (solo se muestra esta vez, cámbiala al entrar): ${a.password}\n`
-    : `Primer administrador creado: ${a.email} (contraseña de ADMIN_PASSWORD; se pedirá cambiarla al entrar).`);
+  if (a.forzada)
+    console.log(
+      `\n>>> RESET_ADMIN_PASSWORD activo: contraseña de ${a.email} forzada a la de esa variable. Quítala de Railway en cuanto entres.\n`,
+    );
+  else
+    console.log(
+      a.generada
+        ? `\n>>> PRIMER ADMINISTRADOR creado: ${a.email}\n>>> Contraseña temporal (solo se muestra esta vez, cámbiala al entrar): ${a.password}\n`
+        : `Primer administrador creado: ${a.email} (contraseña de ADMIN_PASSWORD; se pedirá cambiarla al entrar).`,
+    );
 }
 
 const sinDatos = (db.prepare('SELECT COUNT(*) AS n FROM locales').get() as any).n === 0;
@@ -98,7 +104,9 @@ if (!sinDatos && !process.argv.includes('--forzar')) {
   sincronizarCatalogo();
   asegurarAdmin();
   cartas();
-  console.log('Resto de la base ya tenía datos: sin tocar. (Usa --forzar para resembrar todo lo demás desde cero — borra configuración y datos.)');
+  console.log(
+    'Resto de la base ya tenía datos: sin tocar. (Usa --forzar para resembrar todo lo demás desde cero — borra configuración y datos.)',
+  );
   process.exit(0);
 }
 db.exec(`DELETE FROM liquidaciones; DELETE FROM neutralizaciones; DELETE FROM puertas; DELETE FROM coste_personal_mes; DELETE FROM descuentos_mes; DELETE FROM cualitativa;
@@ -118,47 +126,156 @@ sincronizarCatalogo();
 
 // ---- Configuración base por local: importe y parámetros ya decididos; los umbrales se cargan desde la carta de cada local ----
 for (const l of ['L1', 'L2', 'L3']) {
-  repo.guardarConfig(db, l, 'Q4-2026', { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4, umbral_descuentos_pct: 0.3 }, 'seed');
-  repo.guardarPuertas(db, l, 'Q4-2026', { seguridad_alimentaria: 1, reporting_semanas_en_plazo: null, control_caja: 1, integridad: 1 }, 'seed');
+  repo.guardarConfig(
+    db,
+    l,
+    'Q4-2026',
+    { importe_objetivo: 1500, perfil_canal: 'MIXTO', suelo_nota_resenas: 4, umbral_descuentos_pct: 0.3 },
+    'seed',
+  );
+  repo.guardarPuertas(
+    db,
+    l,
+    'Q4-2026',
+    { seguridad_alimentaria: 1, reporting_semanas_en_plazo: null, control_caja: 1, integridad: 1 },
+    'seed',
+  );
 }
 
 // ---- Datos de EJEMPLO, solo con --ejemplo: para ver la herramienta funcionando en Local 1 ----
 if (process.argv.includes('--ejemplo')) {
-  repo.guardarNiveles(db, 'L1', 'Q4-2026', [
-    { kpi: 'K1_FACTURACION', umbral: 166631.89, llave: 235147.71, objetivo: 277719.81, excelencia: 305491.79 },
-    { kpi: 'K2_TICKET', umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 },
-    { kpi: 'K3_PRODUCTOS', umbral: 7, llave: 10.5, objetivo: 14, excelencia: 18 },
-    { kpi: 'K4A_RESENAS_VOLUMEN', umbral: 125, llave: 200, objetivo: 250, excelencia: 325 },
-    { kpi: 'K4B_RESENAS_NOTA', umbral: 4, llave: 4.5, objetivo: 4.75, excelencia: 4.9 },
-    { kpi: 'K5_RATING_UBER', umbral: 4.3, llave: 4.4, objetivo: 4.5, excelencia: 4.7 },
-    { kpi: 'K6A_MISTERIOSO_SALA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
-    { kpi: 'K6B_MISTERIOSO_PRODUCTO', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
-    { kpi: 'K7_PRECISION', umbral: 2.4, llave: 1.9, objetivo: 1.0, excelencia: 0.6 },
-    { kpi: 'K8_COCINA', umbral: 0.3, llave: 0.2, objetivo: 0.1, excelencia: 0 },
-    { kpi: 'K9_DISPONIBILIDAD', umbral: 0, objetivo: 100, excelencia: 100 },
-    { kpi: 'K10_CHECKLIST', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
-    { kpi: 'K11_HALLAZGOS', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
-    { kpi: 'K12A_INICIATIVAS', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
-    { kpi: 'K12B_REPORTES', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
-    { kpi: 'K13_CUALITATIVA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
-  ], ILU);
-  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) => repo.guardarMes(db, 'L1', 'Q4-2026', { mes, prevision_facturacion: [85000, 88000, 105000][i], prevision_resenas: [75, 80, 95][i] }, ILU));
-  repo.guardarMes(db, 'L1', 'Q4-2026', { mes: '2026-10', facturacion_real: 87500, ticket_medio: 35.7, productos_penetracion: 11.2, resenas_volumen: 78, resenas_nota_media: 4.6, prevision_facturacion: 85000, prevision_resenas: 75 }, ILU);
-  repo.guardarUberMes(db, 'L1', 'Q4-2026', { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, online_rate: 100, rating: 4.5 }, ILU, 'automatico', 'ILUSTRATIVO');
+  repo.guardarNiveles(
+    db,
+    'L1',
+    'Q4-2026',
+    [
+      { kpi: 'K1_FACTURACION', umbral: 166631.89, llave: 235147.71, objetivo: 277719.81, excelencia: 305491.79 },
+      { kpi: 'K2_TICKET', umbral: 31.9, llave: 34.3, objetivo: 37.2, excelencia: 39.2 },
+      { kpi: 'K3_PRODUCTOS', umbral: 7, llave: 10.5, objetivo: 14, excelencia: 18 },
+      { kpi: 'K4A_RESENAS_VOLUMEN', umbral: 125, llave: 200, objetivo: 250, excelencia: 325 },
+      { kpi: 'K4B_RESENAS_NOTA', umbral: 4, llave: 4.5, objetivo: 4.75, excelencia: 4.9 },
+      { kpi: 'K5_RATING_UBER', umbral: 4.3, llave: 4.4, objetivo: 4.5, excelencia: 4.7 },
+      { kpi: 'K6A_MISTERIOSO_SALA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+      { kpi: 'K6B_MISTERIOSO_PRODUCTO', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+      { kpi: 'K7_PRECISION', umbral: 2.4, llave: 1.9, objetivo: 1.0, excelencia: 0.6 },
+      { kpi: 'K8_COCINA', umbral: 0.3, llave: 0.2, objetivo: 0.1, excelencia: 0 },
+      { kpi: 'K9_DISPONIBILIDAD', umbral: 0, objetivo: 100, excelencia: 100 },
+      { kpi: 'K10_CHECKLIST', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
+      { kpi: 'K11_HALLAZGOS', umbral: 60, llave: 75, objetivo: 85, excelencia: 100 },
+      { kpi: 'K12A_INICIATIVAS', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
+      { kpi: 'K12B_REPORTES', umbral: 75, llave: 90, objetivo: 100, excelencia: 110 },
+      { kpi: 'K13_CUALITATIVA', umbral: 6, llave: 7, objetivo: 8, excelencia: 10 },
+    ],
+    ILU,
+  );
+  ['2026-10', '2026-11', '2026-12'].forEach((mes, i) =>
+    repo.guardarMes(
+      db,
+      'L1',
+      'Q4-2026',
+      { mes, prevision_facturacion: [85000, 88000, 105000][i], prevision_resenas: [75, 80, 95][i] },
+      ILU,
+    ),
+  );
+  repo.guardarMes(
+    db,
+    'L1',
+    'Q4-2026',
+    {
+      mes: '2026-10',
+      facturacion_real: 87500,
+      ticket_medio: 35.7,
+      productos_penetracion: 11.2,
+      resenas_volumen: 78,
+      resenas_nota_media: 4.6,
+      prevision_facturacion: 85000,
+      prevision_resenas: 75,
+    },
+    ILU,
+  );
+  repo.guardarUberMes(
+    db,
+    'L1',
+    'Q4-2026',
+    { mes: '2026-10', pedidos: 2100, inaccurate_rate: 1.9, food_quality_rate: 0.12, online_rate: 100, rating: 4.5 },
+    ILU,
+    'automatico',
+    'ILUSTRATIVO',
+  );
   const semanas = ['2026-W41', '2026-W42', '2026-W43', '2026-W44'];
   for (const s of semanas.filter(x => x <= repo.semanaISO(new Date().toISOString().slice(0, 10)))) {
-    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'A', 'Manager Local 1', null, A.map(([id]) => ({ linea_id: id, estado: 'CONFORME', aviso_en_24h: false })));
-    repo.guardarChecklist(db, 'L1', 'Q4-2026', s, 'B', 'Manager Local 1', 'Jefe de Cocina 1',
-      B.map(([id], i) => ({ linea_id: id, estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME', aviso_en_24h: s === '2026-W42' && i === 4 })));
+    repo.guardarChecklist(
+      db,
+      'L1',
+      'Q4-2026',
+      s,
+      'A',
+      'Manager Local 1',
+      null,
+      A.map(([id]) => ({ linea_id: id, estado: 'CONFORME', aviso_en_24h: false })),
+    );
+    repo.guardarChecklist(
+      db,
+      'L1',
+      'Q4-2026',
+      s,
+      'B',
+      'Manager Local 1',
+      'Jefe de Cocina 1',
+      B.map(([id], i) => ({
+        linea_id: id,
+        estado: s === '2026-W42' && i === 4 ? 'NO_CONFORME' : 'CONFORME',
+        aviso_en_24h: s === '2026-W42' && i === 4,
+      })),
+    );
   }
-  const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-08', visitante: 'Dirección A', notas: 'Visita de ejemplo', hallazgos: [{ hoja: 'B', linea_id: 'B_arqueta', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true }] });
+  const v1 = repo.guardarVisita(db, 'L1', 'Q4-2026', {
+    fecha: '2026-10-08',
+    visitante: 'Dirección A',
+    notas: 'Visita de ejemplo',
+    hallazgos: [
+      { hoja: 'B', linea_id: 'B_arqueta', descripcion: 'Arqueta con rebosamiento', reportado_previamente: 0, debio_detectarse: true },
+    ],
+  });
   const h1 = (db.prepare('SELECT id FROM hallazgos WHERE visita_id = ?').get(v1) as any).id;
-  repo.guardarVisita(db, 'L1', 'Q4-2026', { fecha: '2026-10-15', visitante: 'Dirección B', hallazgos: [], cierres: [{ hallazgo_id: h1, cerrado: true }] });
-  repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-10-18', evaluador: 'Conocido 1', sala: 8.5, producto: 8.2, detalle: 'Ficha de ejemplo' });
-  repo.guardarFicha(db, 'L1', 'Q4-2026', { fecha: '2026-11-06', evaluador: 'Dirección', sala: 8.1, producto: null, detalle: 'Visita fuera de servicio' });
-  repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'REPORTE', descripcion: 'Cierre semana 41', fecha_limite: '2026-10-13', fecha_cumplido: '2026-10-13' }, ILU);
-  repo.guardarCompromiso(db, 'L1', 'Q4-2026', { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' }, ILU);
+  repo.guardarVisita(db, 'L1', 'Q4-2026', {
+    fecha: '2026-10-15',
+    visitante: 'Dirección B',
+    hallazgos: [],
+    cierres: [{ hallazgo_id: h1, cerrado: true }],
+  });
+  repo.guardarFicha(db, 'L1', 'Q4-2026', {
+    fecha: '2026-10-18',
+    evaluador: 'Conocido 1',
+    sala: 8.5,
+    producto: 8.2,
+    detalle: 'Ficha de ejemplo',
+  });
+  repo.guardarFicha(db, 'L1', 'Q4-2026', {
+    fecha: '2026-11-06',
+    evaluador: 'Dirección',
+    sala: 8.1,
+    producto: null,
+    detalle: 'Visita fuera de servicio',
+  });
+  repo.guardarCompromiso(
+    db,
+    'L1',
+    'Q4-2026',
+    { tipo: 'REPORTE', descripcion: 'Cierre semana 41', fecha_limite: '2026-10-13', fecha_cumplido: '2026-10-13' },
+    ILU,
+  );
+  repo.guardarCompromiso(
+    db,
+    'L1',
+    'Q4-2026',
+    { tipo: 'INICIATIVA', descripcion: 'Carta de otoño en sala', fecha_limite: '2026-10-15', fecha_cumplido: '2026-10-14' },
+    ILU,
+  );
 }
 
 cartas();
-console.log('Sembrado. Los usuarios se gestionan desde Dirección → Usuarios. Los umbrales se cargan desde la carta de cada local (Configuración).' + (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''));
+console.log(
+  'Sembrado. Los usuarios se gestionan desde Dirección → Usuarios. Los umbrales se cargan desde la carta de cada local (Configuración).' +
+    (process.argv.includes('--ejemplo') ? ' Local 1 lleva datos de EJEMPLO.' : ''),
+);
