@@ -8,6 +8,8 @@ import * as repo from '../data/repo';
 import * as auth from '../data/auth';
 import { KPIS, MOTIVO_NEUTRALIZACION_TEXTO, PESOS_BLOQUE } from '../engine/modelo';
 import { importarCsvUber } from './integraciones/ubereats';
+import { configDesdeEntorno } from './integraciones/drive';
+import { copiaADrive } from './copias';
 
 type Row = Record<string, any>;
 export type Acceso = ReturnType<typeof auth.sesion>;
@@ -225,14 +227,27 @@ function rutasDireccion(db: DB, c: Ctx, [r0, r1, r2, r3]: string[]) {
       }
       repo.guardarNeutralizacion(db, r1, r2, b, quien);
       return { ok: true };
-    case 'liquidar':
-      return repo.cerrarLiquidacion(db, r1, r2, b.fecha_extraccion ?? new Date().toISOString().slice(0, 10), quien, !!b.forzar);
+    case 'liquidar': {
+      const r = repo.cerrarLiquidacion(db, r1, r2, b.fecha_extraccion ?? new Date().toISOString().slice(0, 10), quien, !!b.forzar);
+      copiaTrasCierre(db, `${r1}-${r2}`, quien);
+      return r;
+    }
     case 'vaciar':
       if (b.confirmar !== r1) throw new HttpError(400, 'Confirmación incorrecta');
       repo.vaciarDatos(db, r1, r2, quien);
       return { ok: true };
   }
   throw new HttpError(404, 'Ruta desconocida');
+}
+
+/** Tras cada cierre, una copia a Drive que no se borra nunca. Si Drive no está configurado, no hace nada. No retrasa la respuesta. */
+function copiaTrasCierre(db: DB, etiqueta: string, autor: string) {
+  try {
+    if (!configDesdeEntorno()) return;
+  } catch {
+    return; // configuración incorrecta: ya se avisa en la pestaña de copias y en el registro del arranque
+  }
+  copiaADrive(db, 'cierre', { etiqueta, autor }).catch(e => console.error(`Copia del cierre a Drive fallida: ${e.message}`));
 }
 
 export function api(db: DB, c: Ctx): any {

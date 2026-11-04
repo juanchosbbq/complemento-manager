@@ -3,16 +3,17 @@
  * Las rutas están en server/rutas.ts. La sesión va en la cabecera X-Token (ver data/auth.ts).
  */
 import http from 'node:http';
-import { readFileSync, existsSync, statSync, mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { readFileSync, existsSync, statSync } from 'node:fs';
 import { join, extname, resolve, sep } from 'node:path';
 import { abrir } from '../data/db';
 import * as auth from '../data/auth';
 import { api, HttpError } from './rutas';
+import * as copias from './copias';
 
 const db = abrir();
 auth.limpiarSesionesCaducadas(db);
 setInterval(() => auth.limpiarSesionesCaducadas(db), 6 * 3600 * 1000).unref();
+copias.programarCopiaDiaria(db);
 const PUERTO = Number(process.env.PORT ?? 8787);
 const DIST = resolve(new URL('../ui/dist', import.meta.url).pathname);
 /** Tamaño máximo de una petición. Sobra para un CSV mensual de Uber. */
@@ -74,24 +75,17 @@ function json(res: http.ServerResponse, estado: number, cuerpo: unknown) {
   res.end(JSON.stringify(cuerpo));
 }
 
-/** Copia completa de la base de datos (solo Dirección). Se hace con VACUUM INTO: es coherente aunque haya escrituras a la vez. */
-function copiaDeSeguridad(res: http.ServerResponse) {
-  const dir = mkdtempSync(join(tmpdir(), 'copia-'));
-  const fichero = join(dir, 'incentivos.db');
-  try {
-    db.exec(`VACUUM INTO '${fichero.replace(/'/g, "''")}'`);
-    const datos = readFileSync(fichero);
-    const nombre = `incentivos-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, '-')}.db`;
-    res.writeHead(200, {
-      ...SEGURIDAD,
-      'Content-Type': 'application/octet-stream',
-      'Content-Disposition': `attachment; filename="${nombre}"`,
-      'Cache-Control': 'no-store',
-    });
-    res.end(datos);
-  } finally {
-    rmSync(dir, { recursive: true, force: true });
-  }
+/** Descarga de la copia completa de la base de datos (solo Dirección). */
+function descargarCopia(res: http.ServerResponse) {
+  const datos = copias.crearCopia(db);
+  const nombre = copias.nombreCopia('manual').replace('-manual-', '-');
+  res.writeHead(200, {
+    ...SEGURIDAD,
+    'Content-Type': 'application/octet-stream',
+    'Content-Disposition': `attachment; filename="${nombre}"`,
+    'Cache-Control': 'no-store',
+  });
+  res.end(datos);
 }
 
 async function atenderApi(req: http.IncomingMessage, res: http.ServerResponse, url: URL) {
@@ -101,9 +95,14 @@ async function atenderApi(req: http.IncomingMessage, res: http.ServerResponse, u
     const token = req.headers['x-token'];
     const acceso = token ? auth.sesion(db, String(token)) : null;
     const ruta = url.pathname.slice(5).split('/').filter(Boolean).map(decodeURIComponent);
-    if (ruta[0] === 'copia' && metodo === 'GET') {
+    // Copias de seguridad (solo Dirección). Van aquí y no en rutas.ts porque son binarias o asíncronas.
+    if (ruta[0] === 'copia' || ruta[0] === 'copia-drive') {
       if (acceso?.rol !== 'DIRECCION') throw new HttpError(acceso ? 403 : 401, 'Solo dirección');
-      return copiaDeSeguridad(res);
+      if (ruta[0] === 'copia' && metodo === 'GET') return descargarCopia(res);
+      if (ruta[0] === 'copia-drive' && metodo === 'GET') return json(res, 200, copias.estadoCopias(db));
+      if (ruta[0] === 'copia-drive' && metodo === 'POST')
+        return json(res, 200, await copias.copiaADrive(db, 'manual', { autor: acceso.nombre }));
+      throw new HttpError(404, 'Ruta desconocida');
     }
     json(res, 200, api(db, { metodo, ruta, query: url.searchParams, body, acceso }));
   } catch (e: any) {

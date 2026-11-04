@@ -161,3 +161,8 @@ Perfiles SALA / DELIVERY: Atención 25/15 y Operaciones 15/25; cada KPI escala c
 - **Checklist del Manager con plazo**: cada semana se puede registrar, corregir o borrar hasta 5 días después del domingo (el viernes siguiente). Después queda cerrada para el Manager; Dirección puede corregirla siempre. El servidor valida además que la semana sea del periodo y que las líneas sean del catálogo de su hoja.
 - **PDF del cierre**: desde *Cierre del trimestre*, con bloques, llaves, puertas, cada indicador contra su escala, explicación del cálculo e importe.
 - **Copia de seguridad**: descarga de la base de datos completa desde *Historial y copia*.
+
+## v6.7 (4-nov-2026) — copias automáticas en Google Drive
+
+- Copia diaria a partir de las 3:00 (se conservan las últimas 30), copia en cada cierre de trimestre (no se borra nunca) y botón *Copiar a Drive ahora*. Cada intento queda registrado en *Historial y copia*.
+- Se activa con dos variables en Railway (`GOOGLE_SERVICE_ACCOUNT`, `DRIVE_FOLDER_ID`); los pasos están en el README. Sin ellas, todo sigue como antes y la descarga manual funciona igual.
